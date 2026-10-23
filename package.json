@@ -1,0 +1,12 @@
+{
+  "name": "linkvault",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Next-Gen Cyber URL Shortener with Real-Time Telemetry",
+  "scripts": {
+    "build": "npm --prefix client install && npm --prefix client run build && npm --prefix server install",
+    "start": "node server/server.js",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev"
+  }
+}

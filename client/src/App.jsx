@@ -669,64 +669,6 @@ function App() {
         </div>
       )}
 
-      {/* Mobile & Public Domain Config Modal */}
-      {showDomainModal && (
-        <div className="cyber-modal-backdrop" onClick={() => setShowDomainModal(false)}>
-          <div className="cyber-modal-card domain-modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-top-accent cyan-accent" />
-            <div className="modal-icon-wrap cyan-icon-wrap">
-              <span className="modal-warn-icon">📱</span>
-            </div>
-            <h3 className="modal-title">Enable Mobile &amp; Global Links</h3>
-            <p className="modal-desc">
-              By default, links use <code className="modal-code">localhost:5000</code> which only opens on this computer.
-              To make shortened links open on your mobile without exposing your personal IP, paste your secure domain or tunnel URL below.
-            </p>
-
-            <div className="domain-helper-box">
-              <div className="helper-step">
-                <span className="step-num">1</span>
-                <span>Double-click <code>start-mobile-tunnel.cmd</code> in your LinkVault project folder.</span>
-              </div>
-              <div className="helper-step">
-                <span className="step-num">2</span>
-                <span>Copy the <code>https://....loca.lt</code> link and paste it below:</span>
-              </div>
-            </div>
-
-            <div className="domain-input-wrap">
-              <input
-                type="url"
-                className="domain-input-field"
-                placeholder="https://your-tunnel-name.loca.lt"
-                value={customDomainInput}
-                onChange={(e) => setCustomDomainInput(e.target.value)}
-              />
-            </div>
-
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="modal-btn cancel-btn"
-                onClick={() => handleSaveDomain("")}
-                disabled={savingDomain}
-                title="Reset back to localhost:5000"
-              >
-                Reset to Localhost
-              </button>
-              <button
-                type="button"
-                className="modal-btn save-domain-btn"
-                onClick={() => handleSaveDomain(customDomainInput)}
-                disabled={savingDomain || !customDomainInput.trim()}
-              >
-                {savingDomain ? "Saving..." : "⚡ Activate for Mobile"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Navbar */}
       <header className="ai-navbar">
         <div className="nav-container">
@@ -744,22 +686,6 @@ function App() {
           </div>
 
           <div className="nav-actions">
-            {/* Mobile Domain Setup Button */}
-            <button
-              type="button"
-              className={`domain-pill-btn ${domainConfig.isLocalhost ? "pill-localhost" : "pill-global"}`}
-              onClick={() => {
-                playCyberChime("click");
-                setCustomDomainInput(domainConfig.isLocalhost ? "" : domainConfig.baseUrl);
-                setShowDomainModal(true);
-              }}
-              title="Click to configure mobile and public links"
-            >
-              <span className="domain-live-beacon" />
-              <span>{domainConfig.isLocalhost ? "📱 Mobile Link Setup" : `🌐 ${domainConfig.baseUrl.replace(/^https?:\/\//, '')}`}</span>
-              <span className="gear-symbol">⚙️</span>
-            </button>
-
             {/* Audio Toggle */}
             <button
               type="button"
@@ -771,23 +697,6 @@ function App() {
               title="Toggle futuristic sound feedback"
             >
               <span>{soundEnabled ? "🔊 Sound ON" : "🔇 Sound Muted"}</span>
-            </button>
-
-            {/* Live Database Cluster Status Pill */}
-            <button
-              type="button"
-              className={`cluster-pill status-${dbStatus.state}`}
-              onClick={checkDbStatus}
-              title="Click to check cluster ping latency"
-            >
-              <span className="ping-beacon" />
-              <span className="cluster-text">
-                {dbStatus.state === "connected"
-                  ? `MongoDB Live ${dbStatus.latency ? `(${dbStatus.latency}ms)` : ""}`
-                  : dbStatus.state === "checking"
-                  ? "Pinging Cluster..."
-                  : "Cluster Offline"}
-              </span>
             </button>
 
             <a href="#vault" className="nav-vault-btn">

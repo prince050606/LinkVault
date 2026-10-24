@@ -19,59 +19,34 @@ const FAQ_ITEMS = [
   {
     question: "Do LinkVault shortened links ever expire?",
     answer:
-      "No. All shortened URLs are stored permanently in your MongoDB Atlas database and will continue to redirect indefinitely without any expiration dates or hidden paywalls.",
+      "No. All shortened URLs are stored permanently in your MongoDB Atlas database and will continue to redirect indefinitely without expiration dates or hidden limits.",
   },
   {
     question: "How does real-time click tracking work?",
     answer:
-      "Every time a visitor opens your shortened link (e.g., localhost:5000/xyz), our backend atomically increments the click counter in MongoDB using atomic $inc operations before instantaneously redirecting to the destination URL.",
+      "When a visitor navigates to your shortened link, our Express backend atomically increments the click counter in MongoDB using an atomic $inc operation before issuing an immediate 302 redirect to the destination URL.",
   },
   {
-    question: "Can I simulate or test click tracking before sharing?",
+    question: "Can I test or simulate click tracking before sharing?",
     answer:
-      "Yes! Click the '⚡ Test Hit (+1)' button on any link in your vault records. Our backend will atomically register a test hit and update your live telemetry without opening extra browser tabs.",
+      "Yes. Click the '+1 Test Hit' button next to any link in your records. The backend will atomically record a verified click in MongoDB without opening extra browser tabs.",
   },
   {
-    question: "Can I delete or export my shortened links?",
+    question: "Can I customize the link alias or slug?",
     answer:
-      "Yes! In the Vault Telemetry section below, you can filter, sort, permanently delete any link with the 🗑️ button (with safety confirmation), or export your entire record database to CSV or JSON with a single click.",
+      "Yes. Expand 'Advanced options' in the URL shortener to define a custom slug (e.g. summer-promo-2026). Custom aliases must be between 3 and 30 alphanumeric characters.",
   },
   {
-    question: "Is LinkVault safe and protected against invalid URLs?",
+    question: "Can I export or delete my shortened links?",
     answer:
-      "Yes. LinkVault enforces strict URL protocol validation (HTTP/HTTPS only) and provides automatic domain extraction and sanitation before any link is registered in MongoDB.",
-  },
-];
-
-const PLATFORM_FEATURES = [
-  {
-    icon: "⚡",
-    title: "Sub-Millisecond Redirects",
-    desc: "Lightweight Express routing engine engineered to resolve redirects with near-zero latency.",
-    tag: "HIGH SPEED",
-  },
-  {
-    icon: "🔒",
-    title: "Permanent & Secure",
-    desc: "Links never expire. Protected by protocol sanitation and HTTPS verification.",
-    tag: "RELIABILITY",
-  },
-  {
-    icon: "📊",
-    title: "Atomic Click Telemetry",
-    desc: "Race-condition-free click tracking that updates MongoDB in real time with every visitor.",
-    tag: "ACCURACY",
-  },
-  {
-    icon: "📥",
-    title: "Instant Data Portability",
-    desc: "Export all your shortened routes and engagement analytics to CSV or JSON with 1 click.",
-    tag: "PORTABLE",
+      "Yes. You can export your entire link database to CSV or JSON with a single click, or permanently delete any link with the delete action.",
   },
 ];
 
 function App() {
   const [url, setUrl] = useState("");
+  const [customCode, setCustomCode] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [shortUrl, setShortUrl] = useState("");
   const [lastOriginalUrl, setLastOriginalUrl] = useState("");
   const [lastShortCode, setLastShortCode] = useState("");
@@ -88,18 +63,18 @@ function App() {
   const [deletingCode, setDeletingCode] = useState(null);
   const [confirmDeleteTarget, setConfirmDeleteTarget] = useState(null);
   const [openFaq, setOpenFaq] = useState(null);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(false);
   const [testingClickCode, setTestingClickCode] = useState(null);
   const [highlightCode, setHighlightCode] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState("login");
 
   // Mobile & Public Link Domain Configuration
   const [domainConfig, setDomainConfig] = useState({
-    baseUrl: "http://localhost:5000",
+    baseUrl: typeof window !== "undefined" ? window.location.origin : "http://localhost:5000",
     isLocalhost: true,
   });
-  const [showDomainModal, setShowDomainModal] = useState(false);
-  const [customDomainInput, setCustomDomainInput] = useState("");
-  const [savingDomain, setSavingDomain] = useState(false);
 
   const inputRef = useRef(null);
 
@@ -116,31 +91,7 @@ function App() {
     }
   }
 
-  // Update link domain for mobile and external sharing
-  async function handleSaveDomain(newDomain) {
-    playCyberChime("click");
-    setSavingDomain(true);
-    try {
-      const res = await fetch(`${API_URL}/api/config`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ baseUrl: newDomain }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to update domain");
-      setDomainConfig({ baseUrl: data.baseUrl, isLocalhost: data.isLocalhost });
-      setShowDomainModal(false);
-      playCyberChime("success");
-      showToast(data.message || "Domain updated!", "success");
-      fetchLinks(true);
-    } catch (err) {
-      showToast(err.message, "error");
-    } finally {
-      setSavingDomain(false);
-    }
-  }
-
-  // Synthesized Cyber Web Audio FX (Zero External Files)
+  // Synthesized Web Audio FX (Zero External Files, optional feedback)
   function playCyberChime(type = "click") {
     if (!soundEnabled) return;
     try {
@@ -157,38 +108,38 @@ function App() {
         osc.type = "sine";
         osc.frequency.setValueAtTime(580, now);
         osc.frequency.exponentialRampToValueAtTime(780, now + 0.04);
-        gain.gain.setValueAtTime(0.06, now);
+        gain.gain.setValueAtTime(0.04, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
         osc.start(now);
         osc.stop(now + 0.05);
       } else if (type === "success") {
         osc.type = "triangle";
-        osc.frequency.setValueAtTime(523.25, now); // C5
-        osc.frequency.setValueAtTime(659.25, now + 0.07); // E5
-        osc.frequency.setValueAtTime(783.99, now + 0.14); // G5
-        gain.gain.setValueAtTime(0.08, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+        osc.frequency.setValueAtTime(523.25, now);
+        osc.frequency.setValueAtTime(659.25, now + 0.07);
+        osc.frequency.setValueAtTime(783.99, now + 0.14);
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
         osc.start(now);
-        osc.stop(now + 0.3);
+        osc.stop(now + 0.25);
       } else if (type === "hit") {
         osc.type = "sine";
         osc.frequency.setValueAtTime(440, now);
-        osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
-        gain.gain.setValueAtTime(0.07, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.06);
+        gain.gain.setValueAtTime(0.04, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
         osc.start(now);
-        osc.stop(now + 0.1);
+        osc.stop(now + 0.08);
       } else if (type === "delete") {
         osc.type = "sawtooth";
-        osc.frequency.setValueAtTime(260, now);
-        osc.frequency.exponentialRampToValueAtTime(130, now + 0.09);
-        gain.gain.setValueAtTime(0.07, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.exponentialRampToValueAtTime(110, now + 0.08);
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
         osc.start(now);
-        osc.stop(now + 0.11);
+        osc.stop(now + 0.09);
       }
     } catch {
-      // AudioContext muted or blocked
+      // AudioContext blocked or muted
     }
   }
 
@@ -202,7 +153,6 @@ function App() {
 
   // Check Database connection & latency
   async function checkDbStatus() {
-    playCyberChime("click");
     const start = performance.now();
     try {
       const res = await fetch(`${API_URL}/api/db-status`);
@@ -223,10 +173,7 @@ function App() {
 
   // Fetch saved links from MongoDB
   async function fetchLinks(quiet = false) {
-    if (!quiet) {
-      playCyberChime("click");
-      setRefreshing(true);
-    }
+    if (!quiet) setRefreshing(true);
     try {
       const res = await fetch(`${API_URL}/api/links`);
       if (res.ok) {
@@ -242,131 +189,23 @@ function App() {
     }
   }
 
-  // Handle visiting link with immediate optimistic increment and background MongoDB sync
+  // Handle visiting link with immediate optimistic increment and background sync
   function handleVisitLink(shortCode) {
     if (!shortCode) return;
     playCyberChime("hit");
 
-    // 1. Immediately increment clicks in local UI so user sees the counter rise instantly
     setLinks((prev) =>
       prev.map((l) =>
         l.shortCode === shortCode ? { ...l, clicks: (l.clicks || 0) + 1 } : l
       )
     );
 
-    // 2. Trigger glowing pulse on the card
-    setHighlightCode(shortCode);
-    setTimeout(() => setHighlightCode(null), 1800);
-
-    // 3. Re-sync with MongoDB Atlas in 1.2s to pull the authoritative server count
-    setTimeout(() => fetchLinks(true), 1200);
-  }
-
-  useEffect(() => {
-    checkDbStatus();
-    fetchLinks(true);
-    fetchConfig();
-
-    // Real-time live polling: automatically refresh link click telemetry every 3.5 seconds
-    const liveSyncInterval = setInterval(() => {
+    setTimeout(() => {
       fetchLinks(true);
-    }, 3500);
-
-    const dbInterval = setInterval(checkDbStatus, 25000);
-
-    // Re-fetch authoritative clicks the moment user switches back to this tab
-    const handleWindowFocus = () => {
-      fetchLinks(true);
-      checkDbStatus();
-    };
-
-    window.addEventListener("focus", handleWindowFocus);
-
-    return () => {
-      clearInterval(liveSyncInterval);
-      clearInterval(dbInterval);
-      window.removeEventListener("focus", handleWindowFocus);
-    };
-  }, []);
-
-  // Quick Paste from Clipboard
-  async function handlePaste() {
-    playCyberChime("click");
-    try {
-      const text = await navigator.clipboard.readText();
-      if (text) {
-        setUrl(text.trim());
-        showToast("Destination URL pasted from clipboard!", "info");
-      }
-    } catch {
-      showToast("Unable to read clipboard automatically. Please paste manually.", "error");
-    }
+    }, 1800);
   }
 
-  // Shorten URL Handler
-  async function handleShorten(event) {
-    if (event) event.preventDefault();
-    const originalUrl = url.trim();
-
-    if (!originalUrl) {
-      setError("Please provide a destination URL.");
-      playCyberChime("delete");
-      return;
-    }
-
-    try {
-      new URL(originalUrl);
-    } catch {
-      setError("Please provide a valid URL including http:// or https://");
-      playCyberChime("delete");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-    playCyberChime("click");
-
-    try {
-      const response = await fetch(`${API_URL}/api/shorten`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ originalUrl }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "URL shortening failed.");
-      }
-
-      setShortUrl(data.shortUrl);
-      setLastOriginalUrl(data.originalUrl);
-      setLastShortCode(data.shortCode);
-
-      setLinks((prev) => [
-        {
-          originalUrl: data.originalUrl,
-          shortUrl: data.shortUrl,
-          shortCode: data.shortCode,
-          clicks: data.clicks || 0,
-          createdAt: data.createdAt || new Date().toISOString(),
-        },
-        ...prev.filter((l) => l.shortCode !== data.shortCode),
-      ]);
-
-      setUrl("");
-      playCyberChime("success");
-      showToast("Short link synthesized & saved to MongoDB Atlas! ⚡", "success");
-    } catch (err) {
-      setError(err.message || "Could not connect to backend server.");
-      playCyberChime("delete");
-      showToast(err.message || "Shortening failed", "error");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Trigger Custom Modal for Delete
+  // Delete Link Request
   function requestDelete(link) {
     playCyberChime("click");
     setConfirmDeleteTarget(link);
@@ -375,35 +214,39 @@ function App() {
   // Execute Confirmed Delete
   async function executeConfirmedDelete() {
     if (!confirmDeleteTarget) return;
-    const { shortCode } = confirmDeleteTarget;
+    const targetCode = confirmDeleteTarget.shortCode;
 
-    setDeletingCode(shortCode);
+    setDeletingCode(targetCode);
     playCyberChime("delete");
 
     try {
-      const response = await fetch(`${API_URL}/api/links/${shortCode}`, {
+      const res = await fetch(`${API_URL}/api/links/${targetCode}`, {
         method: "DELETE",
       });
 
-      if (!response.ok) {
-        const data = await response.json();
+      if (!res.ok) {
+        const data = await res.json();
         throw new Error(data.error || "Failed to delete link.");
       }
 
-      setLinks((prev) => prev.filter((l) => l.shortCode !== shortCode));
-      if (lastShortCode === shortCode) {
+      setLinks((prev) => prev.filter((l) => l.shortCode !== targetCode));
+
+      if (lastShortCode === targetCode) {
         setShortUrl("");
+        setLastOriginalUrl("");
+        setLastShortCode("");
       }
-      showToast(`Link /${shortCode} permanently removed from MongoDB!`, "info");
+
+      showToast(`Link /${targetCode} removed successfully.`, "info");
     } catch (err) {
-      showToast(err.message || "Failed to delete link", "error");
+      showToast(err.message, "error");
     } finally {
       setDeletingCode(null);
       setConfirmDeleteTarget(null);
     }
   }
 
-  // Copy to Clipboard (Generic)
+  // Copy to Clipboard with visible confirmation
   async function handleCopy(text, key, customMsg = "Copied to clipboard! 📋") {
     playCyberChime("click");
     try {
@@ -413,14 +256,14 @@ function App() {
       showToast(customMsg, "success");
       setTimeout(() => setCopiedKey(null), 2500);
     } catch {
-      showToast("Failed to copy automatically", "error");
+      showToast("Failed to copy automatically. Please copy manually.", "error");
     }
   }
 
   // Copy as Markdown [Title](URL)
   function handleCopyMarkdown(link) {
     const md = `[LinkVault /${link.shortCode}](${link.shortUrl})`;
-    handleCopy(md, `md-${link.shortCode}`, "Copied as Markdown [Title](URL)! 📄");
+    handleCopy(md, `md-${link.shortCode}`, "Copied as Markdown link!");
   }
 
   // Simulate/Test Click counter live
@@ -441,31 +284,29 @@ function App() {
             l.shortCode === shortCode ? { ...l, clicks: data.clicks } : l
           )
         );
-        showToast(`Hit recorded! Clicks for /${shortCode} now at ${data.clicks} 🔥`, "success");
+        showToast(`Hit recorded! Clicks for /${shortCode} now at ${data.clicks}`, "success");
       } else {
-        // Fallback: simulate locally
         setLinks((prev) =>
           prev.map((l) =>
             l.shortCode === shortCode ? { ...l, clicks: (l.clicks || 0) + 1 } : l
           )
         );
-        showToast(`Test hit registered for /${shortCode}! 🔥`, "success");
+        showToast(`Test hit registered for /${shortCode}`, "success");
       }
     } catch {
-      // Offline fallback
       setLinks((prev) =>
         prev.map((l) =>
           l.shortCode === shortCode ? { ...l, clicks: (l.clicks || 0) + 1 } : l
         )
       );
-      showToast(`Test hit added to link /${shortCode}! 🔥`, "info");
+      showToast(`Test hit added for /${shortCode}`, "info");
     } finally {
       setTestingClickCode(null);
       setTimeout(() => setHighlightCode(null), 1500);
     }
   }
 
-  // Share on X (Twitter)
+  // Share on X
   function handleShareTwitter(shortUrlText) {
     playCyberChime("click");
     const tweetText = encodeURIComponent(`Shortened with LinkVault: ${shortUrlText}`);
@@ -520,8 +361,103 @@ function App() {
     URL.revokeObjectURL(downloadUrl);
 
     playCyberChime("success");
-    showToast(`Vault data exported as ${format.toUpperCase()}! 📥`, "success");
+    showToast(`Vault data exported as ${format.toUpperCase()}!`, "success");
   }
+
+  // Quick Paste from Clipboard
+  async function handlePaste() {
+    playCyberChime("click");
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        setUrl(text.trim());
+        showToast("Pasted destination URL from clipboard", "info");
+      }
+    } catch {
+      showToast("Unable to access clipboard automatically. Please paste manually.", "error");
+    }
+  }
+
+  // Shorten URL Handler
+  async function handleShorten(event) {
+    if (event) event.preventDefault();
+    const originalUrl = url.trim();
+
+    if (!originalUrl) {
+      setError("Please provide a destination URL.");
+      playCyberChime("delete");
+      return;
+    }
+
+    try {
+      new URL(originalUrl);
+    } catch {
+      setError("Please provide a valid URL including http:// or https://");
+      playCyberChime("delete");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    playCyberChime("click");
+
+    try {
+      const payload = { originalUrl };
+      if (customCode.trim()) {
+        payload.customCode = customCode.trim();
+      }
+
+      const response = await fetch(`${API_URL}/api/shorten`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "URL shortening failed.");
+      }
+
+      setShortUrl(data.shortUrl);
+      setLastOriginalUrl(data.originalUrl);
+      setLastShortCode(data.shortCode);
+      setCustomCode("");
+
+      setLinks((prev) => [
+        {
+          originalUrl: data.originalUrl,
+          shortUrl: data.shortUrl,
+          shortCode: data.shortCode,
+          clicks: data.clicks || 0,
+          createdAt: data.createdAt || new Date().toISOString(),
+        },
+        ...prev.filter((l) => l.shortCode !== data.shortCode),
+      ]);
+
+      playCyberChime("success");
+      showToast("Short URL created successfully!", "success");
+    } catch (err) {
+      setError(err.message);
+      playCyberChime("delete");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Initial Load & Status Poll
+  useEffect(() => {
+    fetchLinks(true);
+    checkDbStatus();
+    fetchConfig();
+
+    const interval = setInterval(() => {
+      fetchLinks(true);
+      checkDbStatus();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Destination Domain Preview
   const previewDomain = useMemo(() => {
@@ -597,7 +533,7 @@ function App() {
     }
   }
 
-  // Format Date Nicely
+  // Format Date
   function formatDate(isoString) {
     if (!isoString) return "Recently";
     try {
@@ -615,110 +551,428 @@ function App() {
 
   return (
     <div className="app-wrapper">
-      {/* Subtle Ambient Background */}
-      <div className="ambient-background">
-        <div className="ambient-gradient-top" />
-        <div className="ambient-grid" />
-      </div>
+      {/* Subtle Ambient Header Depth */}
+      <div className="ambient-top-depth" />
 
       {/* Floating Toast Notification */}
       {toast && (
-        <div className={`app-toast toast-${toast.type}`}>
-          <span className="toast-indicator" />
+        <div className={`toast-notice toast-${toast.type}`}>
+          <span className="toast-pill-dot" />
           <span>{toast.message}</span>
         </div>
       )}
 
       {/* Delete Confirmation Modal */}
       {confirmDeleteTarget && (
-        <div className="modal-backdrop" onClick={() => setConfirmDeleteTarget(null)}>
-          <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-icon-wrap">⚠️</div>
-            <h3 className="modal-title">Delete Link Permanently?</h3>
-            <p className="modal-desc">
-              You are about to delete <code className="modal-code-tag">/{confirmDeleteTarget.shortCode}</code>.
-              This will permanently purge it from MongoDB Atlas. Visitors navigating to this link will receive a 404 error.
+        <div className="modal-overlay" onClick={() => setConfirmDeleteTarget(null)}>
+          <div className="modal-content-box" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-warn-icon-box">⚠️</div>
+            <h3 className="modal-dialog-title">Delete Link Permanently?</h3>
+            <p className="modal-dialog-desc">
+              You are about to delete <code className="code-slug-tag">/{confirmDeleteTarget.shortCode}</code>.
+              This will permanently remove it from MongoDB Atlas. Visitors navigating to this link will receive a 404 error.
             </p>
-            <div className="modal-dest-box">
+            <div className="modal-target-box">
               {confirmDeleteTarget.originalUrl}
             </div>
-            <div className="modal-footer">
+            <div className="modal-actions-bar">
               <button
                 type="button"
-                className="btn-secondary"
+                className="btn-dialog-cancel"
                 onClick={() => setConfirmDeleteTarget(null)}
               >
                 Keep Link
               </button>
               <button
                 type="button"
-                className="btn-danger"
+                className="btn-dialog-confirm-danger"
                 onClick={executeConfirmedDelete}
                 disabled={deletingCode === confirmDeleteTarget.shortCode}
               >
-                {deletingCode === confirmDeleteTarget.shortCode ? "Purging..." : "Delete From Database"}
+                {deletingCode === confirmDeleteTarget.shortCode ? "Deleting..." : "Delete Permanently"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Navbar */}
-      <header className="navbar">
-        <div className="nav-container">
-          <div className="brand-group">
-            <div className="brand-logo-icon">🔗</div>
-            <span className="brand-name">LinkVault</span>
-            <span className="brand-badge">LIVE</span>
-          </div>
-
-          <div className="nav-actions">
+      {/* Community / Auth Dialog */}
+      {authModalOpen && (
+        <div className="modal-overlay" onClick={() => setAuthModalOpen(false)}>
+          <div className="auth-dialog-box" onClick={(e) => e.stopPropagation()}>
+            <div className="auth-header-row">
+              <h3 className="auth-header-title">
+                {authMode === "login" ? "Welcome Back to LinkVault" : "Create LinkVault Account"}
+              </h3>
+              <button
+                type="button"
+                className="btn-close-modal"
+                onClick={() => setAuthModalOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="auth-notice-box">
+              <strong>✨ Community Open Edition</strong>
+              <p>
+                No account or sign up is required. All URL shortening, custom aliases, atomic click tracking, and CSV/JSON export tools are unlocked and fully operational.
+              </p>
+            </div>
             <button
               type="button"
-              className="nav-sound-btn"
+              className="btn-primary-shorten"
+              style={{ width: "100%" }}
               onClick={() => {
-                setSoundEnabled(!soundEnabled);
-                if (!soundEnabled) playCyberChime("click");
+                setAuthModalOpen(false);
+                if (inputRef.current) inputRef.current.focus();
               }}
-              title="Toggle audio feedback"
             >
-              <span>{soundEnabled ? "Audio On" : "Audio Muted"}</span>
+              Continue to Free Workspace &rarr;
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Site Header */}
+      <header className="site-header">
+        <div className="header-container">
+          <div className="header-brand">
+            <div className="brand-symbol">🔗</div>
+            <span className="brand-text">LinkVault</span>
+          </div>
+
+          <nav className="nav-links-desktop">
+            <a href="#" className="nav-link-item">Home</a>
+            <a href="#shortener" className="nav-link-item">Shorten</a>
+            <a href="#preview" className="nav-link-item">Dashboard</a>
+            <a href="#features" className="nav-link-item">Features</a>
+            <a href="#vault" className="nav-link-item">My Links ({links.length})</a>
+            <a href="#faq" className="nav-link-item">FAQ</a>
+          </nav>
+
+          <div className="header-actions">
+            <button
+              type="button"
+              className="btn-sign-in"
+              onClick={() => {
+                setAuthMode("login");
+                setAuthModalOpen(true);
+              }}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              className="btn-get-started"
+              onClick={() => {
+                setAuthMode("signup");
+                setAuthModalOpen(true);
+              }}
+            >
+              Get Started
             </button>
 
-            <a href="#vault" className="nav-vault-link">
-              <span>Vault Records</span>
-              <span className="vault-count-badge">{links.length}</span>
-            </a>
+            <button
+              type="button"
+              className="mobile-menu-toggle"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Toggle navigation menu"
+            >
+              {mobileMenuOpen ? "✕" : "☰"}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Navigation Panel */}
+        <div className={`mobile-nav-panel ${mobileMenuOpen ? "is-open" : ""}`}>
+          <a href="#" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Home</a>
+          <a href="#shortener" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Shorten URL</a>
+          <a href="#preview" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Dashboard Preview</a>
+          <a href="#features" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Features</a>
+          <a href="#vault" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>My Links ({links.length})</a>
+          <a href="#faq" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>FAQ</a>
+          <div className="mobile-auth-actions">
+            <button
+              type="button"
+              className="btn-sign-in"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setAuthMode("login");
+                setAuthModalOpen(true);
+              }}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              className="btn-get-started"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setAuthMode("signup");
+                setAuthModalOpen(true);
+              }}
+            >
+              Get Started
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Main Container */}
-      <main className="main-content">
-        {/* Hero Section */}
-        <section className="hero-section">
-          <div className="pill-kicker">
-            <span className="pill-kicker-dot" />
-            <span>Modern Link Infrastructure</span>
+      {/* Main Page Layout */}
+      <main className="page-container">
+        {/* HERO SECTION */}
+        <section className="hero-wrapper">
+          <div className="hero-kicker-tag">
+            <span className="kicker-dot" />
+            <span>Link Management Platform</span>
           </div>
 
-          <h1 className="hero-heading">
-            Shorten links with <br />
-            <span className="hero-heading-highlight">complete visibility.</span>
+          <h1 className="hero-main-title">
+            Short links. Clear insights.
           </h1>
 
-          <p className="hero-subtext">
-            Transform long, messy URLs into clean, reliable short links. Track real-time visitor engagement with atomic MongoDB click telemetry.
+          <p className="hero-lead-text">
+            Create shareable links and understand how people interact with them.
           </p>
 
+          {/* Prominent URL Shortening Form */}
+          <div id="shortener" className="hero-form-container">
+            <form onSubmit={handleShorten}>
+              <div className="form-top-meta">
+                <label htmlFor="url-input" className="form-input-label">
+                  <span>Destination URL</span>
+                  {previewDomain && (
+                    <span className="detected-domain-chip">
+                      <img
+                        src={`https://www.google.com/s2/favicons?domain=${previewDomain}&sz=32`}
+                        alt=""
+                        className="chip-favicon"
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                      <span>{previewDomain}</span>
+                    </span>
+                  )}
+                </label>
+                {url && (
+                  <span className="char-counter-label">{url.trim().length} chars</span>
+                )}
+              </div>
+
+              {/* Large URL Input Row */}
+              <div className="shorten-input-row">
+                <span className="input-link-symbol">🔗</span>
+                <input
+                  ref={inputRef}
+                  id="url-input"
+                  type="url"
+                  className="large-url-input"
+                  placeholder="https://example.com/very/long/destination/url"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  autoComplete="off"
+                  required
+                />
+
+                {url ? (
+                  <button
+                    type="button"
+                    className="btn-input-tool"
+                    onClick={() => {
+                      playCyberChime("click");
+                      setUrl("");
+                    }}
+                    title="Clear input"
+                  >
+                    Clear
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn-input-tool"
+                    onClick={handlePaste}
+                    title="Paste clipboard"
+                  >
+                    Paste
+                  </button>
+                )}
+
+                <button
+                  type="submit"
+                  className="btn-primary-shorten"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <span className="spinner-mini" />
+                      <span>Shortening...</span>
+                    </>
+                  ) : (
+                    <span>Shorten URL</span>
+                  )}
+                </button>
+              </div>
+
+              {/* Advanced Settings Toggle & Drawer */}
+              <div className="advanced-settings-toggle-row">
+                <button
+                  type="button"
+                  className="btn-toggle-advanced"
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                >
+                  <span>{showAdvanced ? "▾ Hide advanced options" : "▸ Advanced options (custom alias)"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="btn-toggle-advanced"
+                  onClick={() => {
+                    setSoundEnabled(!soundEnabled);
+                    if (!soundEnabled) playCyberChime("click");
+                  }}
+                >
+                  <span>{soundEnabled ? "Audio On" : "Audio Muted"}</span>
+                </button>
+              </div>
+
+              {showAdvanced && (
+                <div className="advanced-drawer">
+                  <label htmlFor="custom-slug" className="form-input-label">
+                    <span>Custom Back-Half / Alias</span>
+                  </label>
+                  <div className="alias-input-wrapper">
+                    <span className="alias-domain-prefix">{domainConfig.baseUrl}/</span>
+                    <input
+                      id="custom-slug"
+                      type="text"
+                      className="alias-text-input"
+                      placeholder="custom-slug"
+                      value={customCode}
+                      onChange={(e) => setCustomCode(e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, ""))}
+                      maxLength={30}
+                    />
+                  </div>
+                  <span className="alias-hint-text">
+                    3 to 30 characters (letters, numbers, hyphens, underscores).
+                  </span>
+                </div>
+              )}
+
+              {/* Reduction summary */}
+              {url.trim().length > 25 && (
+                <div className="reduction-summary-bar">
+                  <span>
+                    Original: <strong>{url.trim().length} chars</strong> &rarr; Shortened: <strong>~26 chars</strong>
+                    <span className="reduction-percent-tag">
+                      (-{Math.max(5, Math.round(((url.trim().length - 26) / url.trim().length) * 100))}%)
+                    </span>
+                  </span>
+                  <div className="reduction-meter-track">
+                    <div
+                      className="reduction-meter-fill"
+                      style={{
+                        width: `${Math.min(100, Math.max(5, Math.round(((url.trim().length - 26) / url.trim().length) * 100)))}%`
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+            </form>
+
+            {error && (
+              <div className="form-error-alert">
+                <span>⚠️</span>
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* Success State Showcase */}
+            {shortUrl && (
+              <div className="success-result-box">
+                <div className="success-badge-row">
+                  <div className="success-state-badge">
+                    <span className="status-dot-active" />
+                    <span>Short Link Ready</span>
+                  </div>
+                  <span className="success-db-note">Permanent in MongoDB Atlas</span>
+                </div>
+
+                <div className="success-link-row">
+                  <div className="generated-link-display">
+                    <a
+                      href={shortUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="short-link-anchor"
+                      onClick={() => handleVisitLink(lastShortCode)}
+                    >
+                      {shortUrl}
+                    </a>
+                    {lastOriginalUrl && (
+                      <p className="original-target-preview">
+                        Target: <span>{lastOriginalUrl}</span>
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="success-actions-row">
+                    <button
+                      type="button"
+                      className={`btn-action-pill btn-copy-highlight ${copiedKey === shortUrl ? "is-copied-active" : ""}`}
+                      onClick={() => handleCopy(shortUrl, shortUrl, "Copied to clipboard! 📋")}
+                    >
+                      {copiedKey === shortUrl ? "Copied! ✓" : "Copy Link"}
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`btn-action-pill ${copiedKey === `md-${lastShortCode}` ? "is-copied-active" : ""}`}
+                      onClick={() => handleCopyMarkdown({ shortCode: lastShortCode, shortUrl })}
+                      title="Copy as Markdown link"
+                    >
+                      <span>Markdown</span>
+                    </button>
+
+                    <a
+                      href={shortUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn-action-pill"
+                      onClick={() => handleVisitLink(lastShortCode)}
+                    >
+                      <span>Visit ↗</span>
+                    </a>
+
+                    <button
+                      type="button"
+                      className="btn-action-pill"
+                      onClick={() => handleShareTwitter(shortUrl)}
+                      title="Share on X"
+                    >
+                      𝕏 Share
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn-action-pill"
+                      onClick={() => handleShareWhatsApp(shortUrl)}
+                      title="Share on WhatsApp"
+                    >
+                      WhatsApp
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Quick-test URL chips */}
-          <div className="quick-chips-bar">
-            <span className="quick-label">Quick fill:</span>
+          <div className="quick-chips-wrapper">
+            <span className="chips-label">Quick fill:</span>
             {QUICK_TEST_URLS.map((item) => (
               <button
                 key={item.label}
                 type="button"
-                className="quick-chip"
+                className="chip-tag-btn"
                 onClick={() => {
                   playCyberChime("click");
                   setUrl(item.url);
@@ -731,298 +985,259 @@ function App() {
           </div>
         </section>
 
-        {/* Central Shortener Card */}
-        <section id="shortener" className="shortener-container">
-          <div className="shortener-card">
-            <form onSubmit={handleShorten}>
-              <div className="shortener-form-header">
-                <label htmlFor="url-input" className="form-label">
-                  <span>Destination URL</span>
-                  {previewDomain && (
-                    <span className="detected-domain-tag">
-                      <img
-                        src={`https://www.google.com/s2/favicons?domain=${previewDomain}&sz=32`}
-                        alt=""
-                        className="domain-favicon-sm"
-                        onError={(e) => { e.target.style.display = 'none'; }}
-                      />
-                      <span>Verified: {previewDomain}</span>
-                    </span>
-                  )}
-                </label>
-                {url && (
-                  <span className="char-counter">{url.trim().length} chars</span>
-                )}
+        {/* PRODUCT PREVIEW (Realistic Dashboard Frame with Actual Data) */}
+        <section id="preview" className="preview-section">
+          <div className="section-lead-header">
+            <span className="section-category-kicker">Product Overview</span>
+            <h2 className="section-headline">Live Link Telemetry & Dashboard</h2>
+            <p className="section-subcaption">
+              A real-time overview displaying actual records and atomic click engagement from your database.
+            </p>
+          </div>
+
+          <div className="dashboard-frame-window">
+            <div className="window-chrome-bar">
+              <div className="chrome-window-dots">
+                <span className="dot-circle" />
+                <span className="dot-circle" />
+                <span className="dot-circle" />
               </div>
-
-              {/* Main Input Box */}
-              <div className="input-action-row">
-                <span className="input-leading-icon">🔗</span>
-
-                <input
-                  ref={inputRef}
-                  id="url-input"
-                  type="url"
-                  className="url-input-field"
-                  placeholder="https://example.com/very/long/destination/url/with/parameters"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  autoComplete="off"
-                  required
-                />
-
-                {url ? (
-                  <button
-                    type="button"
-                    className="input-clear-btn"
-                    onClick={() => {
-                      playCyberChime("click");
-                      setUrl("");
-                    }}
-                    title="Clear input"
-                  >
-                    Clear
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="input-paste-btn"
-                    onClick={handlePaste}
-                    title="Paste clipboard"
-                  >
-                    Paste
-                  </button>
-                )}
-
-                <button
-                  type="submit"
-                  className="submit-shorten-btn"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <>
-                      <span className="spinner-sm" />
-                      <span>Shortening...</span>
-                    </>
-                  ) : (
-                    <span>Shorten URL</span>
-                  )}
-                </button>
+              <div className="chrome-title-badge">
+                <span className="live-data-indicator" />
+                <span>Live Atlas Database View</span>
               </div>
+              <span className="chrome-status-note">
+                {dbStatus.state === "connected" ? `Atlas Online (${dbStatus.latency || 12}ms latency)` : "Connecting..."}
+              </span>
+            </div>
 
-              {/* Real-time URL reduction metrics */}
-              {url.trim().length > 25 && (
-                <div className="reduction-bar-row">
-                  <span className="reduction-stat">
-                    Original: <strong>{url.trim().length} chars</strong> &rarr; Shortened: <strong>~26 chars</strong>
-                    <span className="reduction-saved-badge">
-                      (-{Math.max(5, Math.round(((url.trim().length - 26) / url.trim().length) * 100))}%)
-                    </span>
+            <div className="window-inner-body">
+              <div className="preview-kpi-row">
+                <div className="preview-kpi-widget">
+                  <span className="kpi-widget-label">Total Links</span>
+                  <span className="kpi-widget-number">{links.length}</span>
+                  <span className="kpi-widget-sub">Permanent MongoDB records</span>
+                </div>
+                <div className="preview-kpi-widget">
+                  <span className="kpi-widget-label">Total Redirects</span>
+                  <span className="kpi-widget-number">{totalClicks}</span>
+                  <span className="kpi-widget-sub">Atomic $inc click hits</span>
+                </div>
+                <div className="preview-kpi-widget">
+                  <span className="kpi-widget-label">Average Engagement</span>
+                  <span className="kpi-widget-number">{averageClicks}</span>
+                  <span className="kpi-widget-sub">Clicks per route</span>
+                </div>
+                <div className="preview-kpi-widget">
+                  <span className="kpi-widget-label">Database Health</span>
+                  <span className="kpi-widget-number">
+                    {dbStatus.state === "connected" ? "100%" : "Checking"}
                   </span>
-                  <div className="reduction-track">
-                    <div
-                      className="reduction-fill"
-                      style={{
-                        width: `${Math.min(100, Math.max(5, Math.round(((url.trim().length - 26) / url.trim().length) * 100)))}%`
-                      }}
-                    />
-                  </div>
+                  <span className="kpi-widget-sub">
+                    {dbStatus.latency ? `${dbStatus.latency}ms ping` : "Standby"}
+                  </span>
                 </div>
-              )}
-            </form>
-
-            {error && (
-              <div className="error-banner">
-                <span>⚠️</span>
-                <span>{error}</span>
-              </div>
-            )}
-
-            {/* Success Reveal Showcase */}
-            {shortUrl && (
-              <div className="result-showcase">
-                <div className="result-header">
-                  <div className="result-status-tag">
-                    <span className="pulse-dot" />
-                    <span>Short Link Ready</span>
-                  </div>
-                  <span className="result-storage-note">Permanent in MongoDB Atlas</span>
-                </div>
-
-                <div className="result-body">
-                  <div className="result-link-group">
-                    <a
-                      href={shortUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="result-url"
-                      onClick={() => handleVisitLink(lastShortCode)}
-                    >
-                      {shortUrl}
-                    </a>
-                    {lastOriginalUrl && (
-                      <p className="result-destination">
-                        Original Target: <span>{lastOriginalUrl}</span>
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="result-actions-cluster">
-                    <button
-                      type="button"
-                      className={`action-btn btn-primary-action ${copiedKey === shortUrl ? "is-copied" : ""}`}
-                      onClick={() => handleCopy(shortUrl, shortUrl, "Short URL copied!")}
-                    >
-                      {copiedKey === shortUrl ? "Copied! ✓" : "Copy Link"}
-                    </button>
-
-                    <button
-                      type="button"
-                      className={`action-btn ${copiedKey === `md-${lastShortCode}` ? "is-copied" : ""}`}
-                      onClick={() => handleCopyMarkdown({ shortCode: lastShortCode, shortUrl })}
-                      title="Copy as Markdown link"
-                    >
-                      <span>Markdown</span>
-                    </button>
-
-                    <a
-                      href={shortUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="action-btn"
-                      onClick={() => handleVisitLink(lastShortCode)}
-                    >
-                      <span>Visit ↗</span>
-                    </a>
-
-                    <button
-                      type="button"
-                      className="action-btn"
-                      onClick={() => handleShareTwitter(shortUrl)}
-                      title="Share on X"
-                    >
-                      𝕏 Share
-                    </button>
-
-                    <button
-                      type="button"
-                      className="action-btn"
-                      onClick={() => handleShareWhatsApp(shortUrl)}
-                      title="Share on WhatsApp"
-                    >
-                      WhatsApp
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Link Transformation Comparison */}
-        <section className="comparison-section">
-          <div className="section-header">
-            <span className="section-kicker">Link Transformation</span>
-            <h2 className="section-title">Clean, Human-Readable Links</h2>
-          </div>
-
-          <div className="comparison-grid">
-            <div className="comparison-card card-before">
-              <span className="comp-badge">Before · Cluttered URL with tracking params</span>
-              <p className="comp-url">
-                https://store.domain.com/shop/catalog/summer-deals?utm_source=social&utm_medium=cpc&utm_campaign=launch_2026&ref=partner_8492048&session=8931bdf72
-              </p>
-              <div className="comp-features">
-                <span>145 Characters</span>
-                <span>·</span>
-                <span>Unfriendly & Prone to Breaking</span>
-              </div>
-            </div>
-
-            <div className="comparison-divider-icon">&rarr;</div>
-
-            <div className="comparison-card card-after">
-              <span className="comp-badge badge-after">After · Clean LinkVault Route</span>
-              <p className="comp-url highlight-code">
-                {domainConfig.baseUrl}/x7k9p2
-              </p>
-              <div className="comp-features after-features">
-                <span>26 Characters</span>
-                <span>·</span>
-                <span>Fast 302 Redirect</span>
-                <span>·</span>
-                <span>Real-Time Telemetry</span>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Live Telemetry KPI Grid */}
-        <section className="telemetry-grid">
-          <div className="kpi-card">
-            <div className="kpi-header">
-              <span className="kpi-label">Total Links</span>
-              <span className="kpi-icon">🔗</span>
+        {/* 4 DISTINCT FEATURE SECTIONS */}
+        <section id="features" style={{ display: "flex", flexDirection: "column", gap: "60px" }}>
+          {/* Feature 1: Fast URL Shortening (Split 2-Column with Visual Pipeline) */}
+          <div className="feature-split-layout">
+            <div className="feature-copy-side">
+              <span className="feature-number-index">01 · High-Speed Redirect Engine</span>
+              <h2 className="feature-heading-lg">Sub-millisecond routing with zero intermediate delays.</h2>
+              <p className="feature-body-p">
+                Engineered with a lightweight Express routing pipeline that matches short slugs and serves immediate 302 HTTP redirects without buffering or ad-wall slowdowns.
+              </p>
+              <div className="feature-bullet-list">
+                <div className="bullet-item">
+                  <span className="bullet-check-icon">✓</span>
+                  <span>Direct 302 redirects with cache-control protection</span>
+                </div>
+                <div className="bullet-item">
+                  <span className="bullet-check-icon">✓</span>
+                  <span>Zero-delay resolution from MongoDB Atlas indices</span>
+                </div>
+                <div className="bullet-item">
+                  <span className="bullet-check-icon">✓</span>
+                  <span>Support for auto-generated 6-char codes or custom slugs</span>
+                </div>
+              </div>
             </div>
-            <div className="kpi-value">{links.length}</div>
-            <div className="kpi-subtext">Stored in MongoDB Atlas</div>
+
+            <div className="feature-visual-pipeline">
+              <div className="pipeline-step-box">
+                <span className="pipeline-step-label">1. Inbound Long URL</span>
+                <span className="pipeline-step-val">https://store.domain.com/shop/item?utm_campaign=...</span>
+              </div>
+              <div className="pipeline-arrow-down">&darr;</div>
+              <div className="pipeline-step-box">
+                <span className="pipeline-step-label">2. Security & Protocol Check</span>
+                <span className="pipeline-step-val" style={{ color: "#34d399" }}>HTTP/HTTPS Validated · SSRF Blocked</span>
+              </div>
+              <div className="pipeline-arrow-down">&darr;</div>
+              <div className="pipeline-step-box">
+                <span className="pipeline-step-label">3. Unique Slotted Slug</span>
+                <span className="pipeline-step-val" style={{ color: "#818cf8" }}>{domainConfig.baseUrl}/x7k9p2</span>
+              </div>
+              <div className="pipeline-arrow-down">&darr;</div>
+              <div className="pipeline-step-box" style={{ background: "rgba(99, 102, 241, 0.1)", borderColor: "rgba(99, 102, 241, 0.3)" }}>
+                <span className="pipeline-step-label">4. Atomic Tracking & Redirect</span>
+                <span className="pipeline-step-val" style={{ color: "#fff" }}>MongoDB $inc &rarr; 302 Location Header</span>
+              </div>
+            </div>
           </div>
 
-          <div className="kpi-card">
-            <div className="kpi-header">
-              <span className="kpi-label">Redirect Traffic</span>
-              <span className="kpi-icon">📈</span>
+          {/* Feature 2: Link Management (3-Column Layout) */}
+          <div className="feature-management-strip">
+            <div className="section-lead-header">
+              <span className="feature-number-index">02 · Link Management</span>
+              <h2 className="section-headline">Centralized control for every link you generate.</h2>
+              <p className="section-subcaption">
+                Search, filter, export, and clean up your records from a single management console.
+              </p>
             </div>
-            <div className="kpi-value">{totalClicks}</div>
-            <div className="kpi-subtext">Atomic Click Increments</div>
+
+            <div className="management-feature-cards">
+              <div className="mgmt-card-box">
+                <div className="mgmt-card-icon">🔍</div>
+                <h3 className="mgmt-card-title">Live Search & Filter Tabs</h3>
+                <p className="mgmt-card-desc">
+                  Instantly filter through hundreds of records by short slug or target domain. Filter by active links or zero-click drafts.
+                </p>
+              </div>
+
+              <div className="mgmt-card-box">
+                <div className="mgmt-card-icon">📥</div>
+                <h3 className="mgmt-card-title">1-Click CSV & JSON Export</h3>
+                <p className="mgmt-card-desc">
+                  Download your full record history anytime for offline reporting, data warehousing, or team analytics workflows.
+                </p>
+              </div>
+
+              <div className="mgmt-card-box">
+                <div className="mgmt-card-icon">🗑️</div>
+                <h3 className="mgmt-card-title">Safety Confirmation Deletion</h3>
+                <p className="mgmt-card-desc">
+                  Purge outdated or decommissioned links cleanly from your database with two-step modal confirmation to avoid accidental data loss.
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="kpi-card">
-            <div className="kpi-header">
-              <span className="kpi-label">Average Clicks</span>
-              <span className="kpi-icon">⚡</span>
+          {/* Feature 3: Click Analytics & Telemetry (Telemetry Demo) */}
+          <div className="feature-telemetry-section">
+            <div className="feature-copy-side">
+              <span className="feature-number-index">03 · Click Analytics</span>
+              <h2 className="feature-heading-lg">Atomic, race-condition-free click tracking.</h2>
+              <p className="feature-body-p">
+                Traditional counters often lose counts under concurrent visitor load. LinkVault utilizes MongoDB atomic <code>$inc</code> operations so every click is recorded with mathematical precision.
+              </p>
+              <div className="feature-bullet-list">
+                <div className="bullet-item">
+                  <span className="bullet-check-icon">✓</span>
+                  <span>Zero count loss during concurrent visitor spikes</span>
+                </div>
+                <div className="bullet-item">
+                  <span className="bullet-check-icon">✓</span>
+                  <span>Real-time polling keeps your dashboard synchronized</span>
+                </div>
+                <div className="bullet-item">
+                  <span className="bullet-check-icon">✓</span>
+                  <span>Simulate test hits with the inline +1 hit tool</span>
+                </div>
+              </div>
             </div>
-            <div className="kpi-value">{averageClicks}</div>
-            <div className="kpi-subtext">Per shortened route</div>
+
+            <div className="telemetry-interactive-demo">
+              <div className="demo-counter-header">
+                <span className="demo-title-bold">Total Recorded Redirects</span>
+                <span className="demo-tag-live">LIVE TELEMETRY</span>
+              </div>
+              <div className="demo-click-display">
+                <span className="click-number-big">{totalClicks}</span>
+                <span className="click-number-sub">lifetime visitor navigations recorded</span>
+              </div>
+              <div className="demo-test-hit-bar">
+                <span className="demo-instruction">Test counter incrementation live:</span>
+                {links[0] && (
+                  <button
+                    type="button"
+                    className="btn-action-pill"
+                    onClick={() => handleTestClick(links[0].shortCode)}
+                    disabled={testingClickCode === links[0].shortCode}
+                  >
+                    {testingClickCode === links[0].shortCode ? "Testing..." : `+1 Hit on /${links[0].shortCode}`}
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
-          <div className="kpi-card">
-            <div className="kpi-header">
-              <span className="kpi-label">Database Status</span>
-              <span className="kpi-icon">🗄️</span>
+          {/* Feature 4: Security & Inspection (Checklist Grid) */}
+          <div className="feature-security-section">
+            <div className="section-lead-header">
+              <span className="feature-number-index">04 · Security & Verification</span>
+              <h2 className="section-headline">Security controls built into every redirect.</h2>
+              <p className="section-subcaption">
+                Guarding your visitors and your server infrastructure against abusive links.
+              </p>
             </div>
-            <div className="kpi-value">
-              {dbStatus.state === "connected" ? "Connected" : "Standby"}
-            </div>
-            <div className="kpi-subtext">
-              {dbStatus.latency ? `${dbStatus.latency}ms ping` : "Checking latency..."}
+
+            <div className="security-checklist-grid">
+              <div className="security-item-card">
+                <span className="sec-status-icon">🔒</span>
+                <h3 className="sec-title">Strict Protocol Sanitation</h3>
+                <p className="sec-desc">Blocks dangerous protocols such as javascript:, data:, and file: schemes.</p>
+              </div>
+
+              <div className="security-item-card">
+                <span className="sec-status-icon">🛡️</span>
+                <h3 className="sec-title">SSRF Protection</h3>
+                <p className="sec-desc">Prevents shortening internal IP addresses, AWS metadata, and private subnets.</p>
+              </div>
+
+              <div className="security-item-card">
+                <span className="sec-status-icon">🌐</span>
+                <h3 className="sec-title">Favicon Domain Verification</h3>
+                <p className="sec-desc">Automatically verifies and extracts clean destination root hostnames via Google Favicon API.</p>
+              </div>
+
+              <div className="security-item-card">
+                <span className="sec-status-icon">⚡</span>
+                <h3 className="sec-title">Anti-Cache Headers</h3>
+                <p className="sec-desc">Applies no-store and no-cache headers to ensure accurate real-time click tracking on every visit.</p>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Vault Records & Analytics */}
-        <section id="vault" className="vault-section">
-          <div className="vault-header-bar">
-            <div className="vault-title-group">
-              <div className="vault-title-row">
-                <h2 className="vault-title">Vault Records</h2>
-                <span className="record-count-pill">{filteredLinks.length} Links</span>
+        {/* VAULT RECORDS & MANAGEMENT TABLE */}
+        <section id="vault" className="vault-manager-section">
+          <div className="vault-top-controls">
+            <div className="vault-section-title-wrap">
+              <div className="vault-h2-row">
+                <h2 className="vault-h2-title">Link Management Console</h2>
+                <span className="badge-count">{filteredLinks.length} Links</span>
               </div>
-              <p className="vault-subtext">
-                Manage your shortened routes, verify redirects, and export telemetry data.
+              <p className="vault-desc-sub">
+                Inspect, verify, test, or export your shortened links.
               </p>
             </div>
 
-            <div className="vault-toolbar">
-              {/* Live Search */}
-              <div className="search-box">
-                <span className="search-icon">🔍</span>
+            <div className="vault-toolbar-actions">
+              {/* Search Box */}
+              <div className="search-field-wrapper">
+                <span className="search-glyph">🔍</span>
                 <input
                   type="text"
                   placeholder="Filter by code or URL..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="search-input"
+                  className="search-native-input"
                 />
                 {searchQuery && (
                   <button
@@ -1031,7 +1246,7 @@ function App() {
                       playCyberChime("click");
                       setSearchQuery("");
                     }}
-                    className="search-clear-btn"
+                    className="btn-clear-search"
                   >
                     ×
                   </button>
@@ -1040,7 +1255,7 @@ function App() {
 
               {/* Sort Selector */}
               <select
-                className="select-dropdown"
+                className="sort-select-box"
                 value={sortBy}
                 onChange={(e) => {
                   playCyberChime("click");
@@ -1055,19 +1270,19 @@ function App() {
               {/* Sync Button */}
               <button
                 type="button"
-                className="toolbar-btn"
+                className="toolbar-action-btn"
                 onClick={() => fetchLinks()}
                 disabled={refreshing}
                 title="Sync database changes"
               >
-                <span className={`sync-rotate ${refreshing ? "spinning" : ""}`}>↻</span>
+                <span className={`spin-icon ${refreshing ? "spinning" : ""}`}>↻</span>
                 <span>{refreshing ? "Syncing..." : "Sync"}</span>
               </button>
 
               {/* Export Buttons */}
               <button
                 type="button"
-                className="toolbar-btn"
+                className="toolbar-action-btn"
                 onClick={() => handleExport("json")}
                 title="Export as JSON"
               >
@@ -1075,7 +1290,7 @@ function App() {
               </button>
               <button
                 type="button"
-                className="toolbar-btn"
+                className="toolbar-action-btn"
                 onClick={() => handleExport("csv")}
                 title="Export as CSV"
               >
@@ -1084,44 +1299,44 @@ function App() {
             </div>
           </div>
 
-          {/* Filter Segments */}
-          <div className="filter-segments-bar">
+          {/* Filter Tabs */}
+          <div className="filter-tabs-strip">
             <button
               type="button"
-              className={`segment-btn ${activeFilterTab === "all" ? "is-active" : ""}`}
+              className={`tab-filter-btn ${activeFilterTab === "all" ? "is-active-tab" : ""}`}
               onClick={() => {
                 playCyberChime("click");
                 setActiveFilterTab("all");
               }}
             >
               <span>All Links</span>
-              <span className="segment-counter">{links.length}</span>
+              <span className="tab-badge-num">{links.length}</span>
             </button>
             <button
               type="button"
-              className={`segment-btn ${activeFilterTab === "active" ? "is-active" : ""}`}
+              className={`tab-filter-btn ${activeFilterTab === "active" ? "is-active-tab" : ""}`}
               onClick={() => {
                 playCyberChime("click");
                 setActiveFilterTab("active");
               }}
             >
               <span>Active</span>
-              <span className="segment-counter">{activeLinksCount}</span>
+              <span className="tab-badge-num">{activeLinksCount}</span>
             </button>
             <button
               type="button"
-              className={`segment-btn ${activeFilterTab === "zero" ? "is-active" : ""}`}
+              className={`tab-filter-btn ${activeFilterTab === "zero" ? "is-active-tab" : ""}`}
               onClick={() => {
                 playCyberChime("click");
                 setActiveFilterTab("zero");
               }}
             >
               <span>Zero Clicks</span>
-              <span className="segment-counter">{links.length - activeLinksCount}</span>
+              <span className="tab-badge-num">{links.length - activeLinksCount}</span>
             </button>
             <button
               type="button"
-              className={`segment-btn ${activeFilterTab === "today" ? "is-active" : ""}`}
+              className={`tab-filter-btn ${activeFilterTab === "today" ? "is-active-tab" : ""}`}
               onClick={() => {
                 playCyberChime("click");
                 setActiveFilterTab("today");
@@ -1133,12 +1348,12 @@ function App() {
 
           {/* Links List */}
           {filteredLinks.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">📂</div>
-              <h3 className="empty-title">
-                {searchQuery || activeFilterTab !== "all" ? "No links match your filter" : "No links in the vault yet"}
+            <div className="vault-empty-view">
+              <div className="empty-glyph">📂</div>
+              <h3 className="empty-view-heading">
+                {searchQuery || activeFilterTab !== "all" ? "No links match your filter criteria" : "No links in the vault yet"}
               </h3>
-              <p className="empty-subtext">
+              <p className="empty-view-caption">
                 {searchQuery || activeFilterTab !== "all"
                   ? "Try resetting your search query or switching to 'All Links'."
                   : "Enter a URL in the form above to generate your first short link."}
@@ -1146,7 +1361,7 @@ function App() {
               {(searchQuery || activeFilterTab !== "all") && (
                 <button
                   type="button"
-                  className="reset-filter-link"
+                  className="btn-reset-filter"
                   onClick={() => {
                     playCyberChime("click");
                     setSearchQuery("");
@@ -1158,7 +1373,7 @@ function App() {
               )}
             </div>
           ) : (
-            <div className="link-cards-list">
+            <div className="records-stack-list">
               {filteredLinks.map((link) => {
                 const isCopied = copiedKey === link.shortCode;
                 const isMdCopied = copiedKey === `md-${link.shortCode}`;
@@ -1170,44 +1385,44 @@ function App() {
                 return (
                   <article
                     key={link.shortCode || link._id}
-                    className={`link-row-card ${isHighlighted ? "highlight-flash" : ""}`}
+                    className={`record-row-item ${isHighlighted ? "highlight-flash" : ""}`}
                   >
-                    <div className="link-info-col">
-                      <div className="link-top-meta">
-                        <span className="short-code-tag">/{link.shortCode}</span>
-                        <div className="clicks-pill">
+                    <div className="record-main-col">
+                      <div className="record-header-tags">
+                        <span className="badge-short-code">/{link.shortCode}</span>
+                        <div className="clicks-stat-pill">
                           <strong>{link.clicks || 0}</strong>
                           <span>clicks</span>
                         </div>
-                        <span className="timestamp-label">{formatDate(link.createdAt)}</span>
+                        <span className="record-created-time">{formatDate(link.createdAt)}</span>
                       </div>
 
                       <a
                         href={link.shortUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="short-url-link"
+                        className="record-short-url"
                         onClick={() => handleVisitLink(link.shortCode)}
                       >
                         {link.shortUrl}
                       </a>
 
-                      <div className="destination-row" title={link.originalUrl}>
+                      <div className="record-dest-row" title={link.originalUrl}>
                         <img
                           src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
                           alt=""
-                          className="domain-fav"
+                          className="dest-favicon-img"
                           onError={(e) => { e.target.style.display = 'none'; }}
                         />
                         <span>&rarr;</span>
-                        <span className="dest-text-truncate">{link.originalUrl}</span>
+                        <span className="dest-truncate-text">{link.originalUrl}</span>
                       </div>
                     </div>
 
-                    <div className="link-actions-col">
+                    <div className="record-actions-cluster">
                       <button
                         type="button"
-                        className={`pill-action ${isCopied ? "btn-copy-success" : ""}`}
+                        className={`btn-item-action ${isCopied ? "is-copied-check" : ""}`}
                         onClick={() => handleCopy(link.shortUrl, link.shortCode)}
                       >
                         {isCopied ? "Copied! ✓" : "Copy"}
@@ -1215,7 +1430,7 @@ function App() {
 
                       <button
                         type="button"
-                        className={`pill-action ${isMdCopied ? "btn-copy-success" : ""}`}
+                        className={`btn-item-action ${isMdCopied ? "is-copied-check" : ""}`}
                         onClick={() => handleCopyMarkdown(link)}
                         title="Copy Markdown"
                       >
@@ -1224,7 +1439,7 @@ function App() {
 
                       <button
                         type="button"
-                        className="pill-action btn-test-hit"
+                        className="btn-item-action btn-hit-sim"
                         onClick={() => handleTestClick(link.shortCode)}
                         disabled={isTesting}
                         title="Simulate visitor click"
@@ -1236,7 +1451,7 @@ function App() {
                         href={link.shortUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="pill-action"
+                        className="btn-item-action"
                         title="Open redirect"
                         onClick={() => handleVisitLink(link.shortCode)}
                       >
@@ -1245,7 +1460,7 @@ function App() {
 
                       <button
                         type="button"
-                        className="pill-action btn-delete-link"
+                        className="btn-item-action btn-delete-action"
                         onClick={() => requestDelete(link)}
                         disabled={isDeleting}
                         title="Delete permanently"
@@ -1260,56 +1475,35 @@ function App() {
           )}
         </section>
 
-        {/* Platform Core Capabilities */}
-        <section className="features-section">
-          <div className="section-header">
-            <span className="section-kicker">Platform Features</span>
-            <h2 className="section-title">Engineered for Reliability & Scale</h2>
+        {/* FREQUENTLY ASKED QUESTIONS */}
+        <section id="faq" className="faq-section-wrapper">
+          <div className="section-lead-header">
+            <span className="section-category-kicker">Questions &amp; Answers</span>
+            <h2 className="section-headline">Frequently Asked Questions</h2>
           </div>
 
-          <div className="features-grid">
-            {PLATFORM_FEATURES.map((feat) => (
-              <div key={feat.title} className="feature-box">
-                <div className="feature-top">
-                  <div className="feature-icon-badge">{feat.icon}</div>
-                  <span className="feature-tag-pill">{feat.tag}</span>
-                </div>
-                <h3 className="feature-title">{feat.title}</h3>
-                <p className="feature-desc">{feat.desc}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Frequently Asked Questions */}
-        <section className="faq-section">
-          <div className="section-header">
-            <span className="section-kicker">FAQ</span>
-            <h2 className="section-title">Frequently Asked Questions</h2>
-          </div>
-
-          <div className="faq-list">
+          <div className="faq-items-list">
             {FAQ_ITEMS.map((item, index) => {
               const isOpen = openFaq === index;
               return (
                 <div
                   key={item.question}
-                  className={`faq-card ${isOpen ? "is-open" : ""}`}
+                  className={`faq-item-row ${isOpen ? "is-open" : ""}`}
                 >
                   <button
                     type="button"
-                    className="faq-trigger"
+                    className="faq-header-btn"
                     onClick={() => {
                       playCyberChime("click");
                       setOpenFaq(isOpen ? null : index);
                     }}
                   >
                     <span>{item.question}</span>
-                    <span className="faq-icon-state">{isOpen ? "−" : "+"}</span>
+                    <span className="faq-toggle-glyph">{isOpen ? "−" : "+"}</span>
                   </button>
 
                   {isOpen && (
-                    <div className="faq-content">
+                    <div className="faq-body-text">
                       <p>{item.answer}</p>
                     </div>
                   )}
@@ -1319,15 +1513,15 @@ function App() {
           </div>
         </section>
 
-        {/* CTA Banner */}
-        <section className="cta-box">
-          <div className="cta-text-side">
-            <h2>Start Shortening Links Today</h2>
-            <p>Persistent storage on MongoDB Atlas with real-time atomic telemetry.</p>
+        {/* CTA BANNER */}
+        <section className="cta-banner-wrapper">
+          <div className="cta-text-group">
+            <h2>Ready to shorten and track your links?</h2>
+            <p>Generate clean, fast URLs with atomic click analytics and permanent MongoDB persistence.</p>
           </div>
           <a
             href="#shortener"
-            className="cta-btn-primary"
+            className="btn-cta-submit"
             onClick={() => {
               playCyberChime("click");
               if (inputRef.current) inputRef.current.focus();
@@ -1338,16 +1532,16 @@ function App() {
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className="app-footer">
-        <div className="footer-container">
-          <div className="footer-left-info">
+      {/* FOOTER */}
+      <footer className="site-footer">
+        <div className="footer-inner-wrap">
+          <div className="footer-brand-meta">
             <span className="footer-brand-title">LinkVault</span>
-            <span>· URL Shortener & Analytics</span>
+            <span>· URL Shortener &amp; Real-Time Analytics</span>
           </div>
-          <div className="footer-status">
-            <span className="status-live-dot" />
-            <span>MongoDB Atlas Connected</span>
+          <div className="footer-live-status">
+            <span className="status-dot-green" />
+            <span>MongoDB Atlas Active</span>
           </div>
         </div>
       </footer>

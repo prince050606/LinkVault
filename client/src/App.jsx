@@ -427,8 +427,8 @@ function App() {
       return;
     }
 
-    let fileContent = "";
-    let mimeType = "";
+    let fileContent;
+    let mimeType;
     let filename = `linkvault-export-${new Date().toISOString().slice(0, 10)}`;
 
     if (format === "json") {
@@ -497,25 +497,14 @@ function App() {
   // Focus management: autofocus URL input when modal opens
   useEffect(() => {
     if (createModalOpen) {
-      setUrlError("");
-      setAliasError("");
       const timer = setTimeout(() => {
+        setUrlError("");
+        setAliasError("");
         urlInputRef.current?.focus();
       }, 50);
       return () => clearTimeout(timer);
     }
   }, [createModalOpen]);
-
-  // Destination Domain Preview
-  const previewDomain = useMemo(() => {
-    if (!url) return null;
-    try {
-      const parsed = new URL(url.trim());
-      return parsed.hostname;
-    } catch {
-      return null;
-    }
-  }, [url]);
 
   // Derived Analytics & Statistics (Accurate API-derived metrics, zero fabricated stats)
   const totalClicks = useMemo(
@@ -534,6 +523,7 @@ function App() {
   );
 
   const recentActivityCount = useMemo(() => {
+    // eslint-disable-next-line react-hooks/purity
     const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
     return links.filter((l) => l.createdAt && new Date(l.createdAt).getTime() > oneDayAgo).length;
   }, [links]);
@@ -615,6 +605,7 @@ function App() {
 
   // Reset to page 1 on filter or search change
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentPage(1);
   }, [searchQuery, activeFilterTab, sortBy]);
 
@@ -1479,7 +1470,6 @@ function App() {
                     <tbody>
                       {links.slice(0, 5).map((link) => {
                         const isCopied = copiedKey === link.shortCode;
-                        const isMdCopied = copiedKey === `md-${link.shortCode}`;
                         const isTesting = testingClickCode === link.shortCode;
                         const isHighlighted = highlightCode === link.shortCode;
                         const parsedDest = parseDestinationUrl(link.originalUrl);

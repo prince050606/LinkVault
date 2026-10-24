@@ -46,14 +46,11 @@ function App() {
 
   // Shortener Form State
   const [url, setUrl] = useState("");
-  const [customCode, setCustomCode] = useState("");
   const [urlError, setUrlError] = useState("");
-  const [aliasError, setAliasError] = useState("");
   const [shortUrl, setShortUrl] = useState("");
   const [lastOriginalUrl, setLastOriginalUrl] = useState("");
   const [lastShortCode, setLastShortCode] = useState("");
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // API & Data State
   const [links, setLinks] = useState([]);
@@ -209,7 +206,6 @@ function App() {
     if (loading) return; // Prevent duplicate concurrent submissions
 
     setUrlError("");
-    setAliasError("");
 
     const originalUrl = url.trim();
 
@@ -234,26 +230,11 @@ function App() {
       return;
     }
 
-    const trimmedAlias = customCode.trim();
-    if (trimmedAlias) {
-      if (trimmedAlias.length < 3) {
-        setAliasError("Custom alias must be at least 3 characters long.");
-        return;
-      }
-      if (!/^[a-zA-Z0-9-_]+$/.test(trimmedAlias)) {
-        setAliasError("Custom alias may only contain letters, numbers, hyphens, and underscores.");
-        return;
-      }
-    }
-
     setLoading(true);
     playCyberChime("click");
 
     try {
       const payload = { originalUrl };
-      if (trimmedAlias) {
-        payload.customCode = trimmedAlias;
-      }
 
       const response = await fetch(`${API_URL}/api/shorten`, {
         method: "POST",
@@ -265,21 +246,15 @@ function App() {
 
       if (!response.ok) {
         const errorMsg = data.error || "URL shortening failed.";
-        if (errorMsg.toLowerCase().includes("alias") || errorMsg.toLowerCase().includes("code")) {
-          setAliasError(errorMsg);
-        } else {
-          setUrlError(errorMsg);
-        }
+        setUrlError(errorMsg);
         throw new Error(errorMsg);
       }
 
       setShortUrl(data.shortUrl);
       setLastOriginalUrl(data.originalUrl);
       setLastShortCode(data.shortCode);
-      setCustomCode("");
       setUrl("");
       setUrlError("");
-      setAliasError("");
 
       setLinks((prev) => [
         {
@@ -499,7 +474,6 @@ function App() {
     if (createModalOpen) {
       const timer = setTimeout(() => {
         setUrlError("");
-        setAliasError("");
         urlInputRef.current?.focus();
       }, 50);
       return () => clearTimeout(timer);
@@ -766,37 +740,6 @@ function App() {
                 )}
               </div>
 
-              <div className="form-field-group">
-                <label htmlFor="create-custom-alias" className="form-field-label">
-                  Custom Alias (Optional)
-                </label>
-                <div className={`form-alias-box ${aliasError ? "has-error" : ""}`}>
-                  <span className="alias-prefix-text">
-                    {domainConfig.baseUrl}/
-                  </span>
-                  <input
-                    id="create-custom-alias"
-                    type="text"
-                    placeholder="promo-link"
-                    value={customCode}
-                    onChange={(e) => {
-                      setCustomCode(e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, ""));
-                      if (aliasError) setAliasError("");
-                    }}
-                    maxLength={30}
-                    aria-invalid={!!aliasError}
-                    aria-describedby={aliasError ? "create-alias-error" : undefined}
-                    className="alias-input-element"
-                  />
-                </div>
-                {aliasError && (
-                  <div id="create-alias-error" className="form-field-error" role="alert">
-                    <IconAlertTriangle size={13} />
-                    <span>{aliasError}</span>
-                  </div>
-                )}
-              </div>
-
               {/* Quick Fill Pills */}
               <div className="quick-fill-container">
                 <span className="quick-fill-label">Quick fill:</span>
@@ -923,19 +866,6 @@ function App() {
             </button>
           </div>
 
-          {/* Create Button in Sidebar */}
-          <div className="sidebar-action-wrap">
-            <button
-              type="button"
-              className={`btn-sidebar-create ${sidebarCollapsed ? "collapsed-mode" : ""}`}
-              onClick={() => setCreateModalOpen(true)}
-              title="Create New Short Link"
-            >
-              <IconPlus size={15} />
-              {!sidebarCollapsed && <span>New Link</span>}
-            </button>
-          </div>
-
           {/* Navigation Items */}
           <nav className="sidebar-nav-list">
             <button
@@ -1003,15 +933,6 @@ function App() {
 
         {/* Sidebar Footer */}
         <div className="sidebar-footer">
-          <div className="cluster-status-pill">
-            <span className={`status-indicator-dot ${dbStatus.state === "connected" ? "online" : "offline"}`} />
-            {!sidebarCollapsed && (
-              <span>
-                {dbStatus.state === "connected" ? `Atlas Live (${dbStatus.latency || 12}ms)` : "Atlas Disconnected"}
-              </span>
-            )}
-          </div>
-
           {!sidebarCollapsed && (
             <div className="profile-summary-card">
               <div className="profile-avatar-circle">LV</div>
@@ -1065,15 +986,6 @@ function App() {
               <IconRefresh size={14} className={refreshing ? "is-spinning" : ""} />
               <span>{refreshing ? "Syncing..." : "Sync"}</span>
             </button>
-
-            <button
-              type="button"
-              className="btn-tool-primary"
-              onClick={() => setCreateModalOpen(true)}
-            >
-              <IconPlus size={14} />
-              <span>Create Link</span>
-            </button>
           </div>
         </header>
 
@@ -1111,13 +1023,6 @@ function App() {
                     <h2 className="composer-title">Shorten a URL</h2>
                     <p className="composer-subtitle">Create clean, trackable links with instant click analytics.</p>
                   </div>
-                  <button
-                    type="button"
-                    className="composer-alias-toggle"
-                    onClick={() => setShowAdvanced(!showAdvanced)}
-                  >
-                    {showAdvanced ? "Hide custom alias" : "+ Custom alias"}
-                  </button>
                 </div>
 
                 <form onSubmit={handleShorten} className="composer-form-stack" noValidate>
@@ -1162,36 +1067,6 @@ function App() {
                     <div className="form-field-error" role="alert" style={{ marginTop: "8px" }}>
                       <IconAlertTriangle size={13} />
                       <span>{urlError}</span>
-                    </div>
-                  )}
-
-                  {/* Expandable Alias Row */}
-                  {showAdvanced && (
-                    <div className="composer-alias-row">
-                      <label htmlFor="overview-alias-input" className="composer-alias-label">
-                        Custom route slug:
-                      </label>
-                      <div className={`form-alias-box ${aliasError ? "has-error" : ""}`} style={{ maxWidth: "340px" }}>
-                        <span className="alias-prefix-text">{domainConfig.baseUrl}/</span>
-                        <input
-                          id="overview-alias-input"
-                          type="text"
-                          placeholder="promo-slug"
-                          value={customCode}
-                          onChange={(e) => {
-                            setCustomCode(e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, ""));
-                            if (aliasError) setAliasError("");
-                          }}
-                          maxLength={30}
-                          className="alias-input-element"
-                        />
-                      </div>
-                      {aliasError && (
-                        <div className="form-field-error" role="alert">
-                          <IconAlertTriangle size={13} />
-                          <span>{aliasError}</span>
-                        </div>
-                      )}
                     </div>
                   )}
 

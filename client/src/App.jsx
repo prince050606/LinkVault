@@ -1481,6 +1481,7 @@ function App() {
                         const isCopied = copiedKey === link.shortCode;
                         const isMdCopied = copiedKey === `md-${link.shortCode}`;
                         const isTesting = testingClickCode === link.shortCode;
+                        const isHighlighted = highlightCode === link.shortCode;
                         const parsedDest = parseDestinationUrl(link.originalUrl);
 
                         return (
@@ -1725,6 +1726,7 @@ function App() {
                       const isCopied = copiedKey === link.shortCode;
                       const isMdCopied = copiedKey === `md-${link.shortCode}`;
                       const isTesting = testingClickCode === link.shortCode;
+                      const isHighlighted = highlightCode === link.shortCode;
                       const parsedDest = parseDestinationUrl(link.originalUrl);
 
                       return (

@@ -46,6 +46,8 @@ function App() {
   // Shortener Form State
   const [url, setUrl] = useState("");
   const [customCode, setCustomCode] = useState("");
+  const [urlError, setUrlError] = useState("");
+  const [aliasError, setAliasError] = useState("");
   const [shortUrl, setShortUrl] = useState("");
   const [lastOriginalUrl, setLastOriginalUrl] = useState("");
   const [lastShortCode, setLastShortCode] = useState("");
@@ -55,6 +57,7 @@ function App() {
   // API & Data State
   const [links, setLinks] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [apiError, setApiError] = useState("");
   const [dbStatus, setDbStatus] = useState({ state: "checking", latency: null });
@@ -79,7 +82,7 @@ function App() {
   const [highlightCode, setHighlightCode] = useState(null);
   const [soundEnabled, setSoundEnabled] = useState(false);
 
-  const inputRef = useRef(null);
+  const urlInputRef = useRef(null);
 
   // Fetch current link domain configuration
   async function fetchConfig() {
@@ -195,26 +198,51 @@ function App() {
       setApiError("Failed to fetch links. Please check server connectivity.");
     } finally {
       if (!quiet) setRefreshing(false);
+      setInitialLoading(false);
     }
   }
 
   // Shorten URL Handler
   async function handleShorten(event) {
     if (event) event.preventDefault();
+    if (loading) return; // Prevent duplicate concurrent submissions
+
+    setUrlError("");
+    setAliasError("");
+
     const originalUrl = url.trim();
 
     if (!originalUrl) {
+      setUrlError("Destination URL cannot be empty.");
       showToast("Please provide a destination URL.", "error");
       playCyberChime("delete");
+      urlInputRef.current?.focus();
       return;
     }
 
     try {
-      new URL(originalUrl);
+      const parsed = new URL(originalUrl);
+      if (!parsed.protocol.startsWith("http")) {
+        throw new Error("Protocol must be http:// or https://");
+      }
     } catch {
+      setUrlError("Please enter a valid destination URL (must start with http:// or https://).");
       showToast("Please provide a valid URL including http:// or https://", "error");
       playCyberChime("delete");
+      urlInputRef.current?.focus();
       return;
+    }
+
+    const trimmedAlias = customCode.trim();
+    if (trimmedAlias) {
+      if (trimmedAlias.length < 3) {
+        setAliasError("Custom alias must be at least 3 characters long.");
+        return;
+      }
+      if (!/^[a-zA-Z0-9-_]+$/.test(trimmedAlias)) {
+        setAliasError("Custom alias may only contain letters, numbers, hyphens, and underscores.");
+        return;
+      }
     }
 
     setLoading(true);
@@ -222,8 +250,8 @@ function App() {
 
     try {
       const payload = { originalUrl };
-      if (customCode.trim()) {
-        payload.customCode = customCode.trim();
+      if (trimmedAlias) {
+        payload.customCode = trimmedAlias;
       }
 
       const response = await fetch(`${API_URL}/api/shorten`, {
@@ -235,7 +263,13 @@ function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "URL shortening failed.");
+        const errorMsg = data.error || "URL shortening failed.";
+        if (errorMsg.toLowerCase().includes("alias") || errorMsg.toLowerCase().includes("code")) {
+          setAliasError(errorMsg);
+        } else {
+          setUrlError(errorMsg);
+        }
+        throw new Error(errorMsg);
       }
 
       setShortUrl(data.shortUrl);
@@ -243,6 +277,8 @@ function App() {
       setLastShortCode(data.shortCode);
       setCustomCode("");
       setUrl("");
+      setUrlError("");
+      setAliasError("");
 
       setLinks((prev) => [
         {
@@ -428,9 +464,14 @@ function App() {
 
   // Initial Load
   useEffect(() => {
-    fetchLinks(true);
-    checkDbStatus();
-    fetchConfig();
+    async function loadData() {
+      try {
+        await Promise.allSettled([fetchLinks(true), checkDbStatus(), fetchConfig()]);
+      } finally {
+        setInitialLoading(false);
+      }
+    }
+    loadData();
 
     const interval = setInterval(() => {
       fetchLinks(true);
@@ -439,6 +480,30 @@ function App() {
 
     return () => clearInterval(interval);
   }, []);
+
+  // Keyboard accessibility: Escape key closes active modals
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === "Escape") {
+        if (createModalOpen) setCreateModalOpen(false);
+        if (confirmDeleteTarget) setConfirmDeleteTarget(null);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [createModalOpen, confirmDeleteTarget]);
+
+  // Focus management: autofocus URL input when modal opens
+  useEffect(() => {
+    if (createModalOpen) {
+      setUrlError("");
+      setAliasError("");
+      const timer = setTimeout(() => {
+        urlInputRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [createModalOpen]);
 
   // Destination Domain Preview
   const previewDomain = useMemo(() => {
@@ -589,10 +654,16 @@ function App() {
 
       {/* Delete Confirmation Modal */}
       {confirmDeleteTarget && (
-        <div className="modal-overlay" onClick={() => setConfirmDeleteTarget(null)}>
+        <div
+          className="modal-overlay"
+          onClick={() => setConfirmDeleteTarget(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-dialog-title"
+        >
           <div className="modal-content-box" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header-strip">
-              <h3 className="modal-headline-title">Delete Link</h3>
+              <h3 id="delete-dialog-title" className="modal-headline-title">Delete Link</h3>
               <button
                 type="button"
                 className="btn-modal-close-x"
@@ -623,7 +694,17 @@ function App() {
                 onClick={executeConfirmedDelete}
                 disabled={deletingCode === confirmDeleteTarget.shortCode}
               >
-                {deletingCode === confirmDeleteTarget.shortCode ? "Deleting..." : "Delete Permanently"}
+                {deletingCode === confirmDeleteTarget.shortCode ? (
+                  <>
+                    <IconRefresh size={14} className="is-spinning" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <IconTrash size={14} />
+                    <span>Delete Permanently</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -632,10 +713,16 @@ function App() {
 
       {/* Create Short Link Modal */}
       {createModalOpen && (
-        <div className="modal-overlay" onClick={() => setCreateModalOpen(false)}>
+        <div
+          className="modal-overlay"
+          onClick={() => setCreateModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-dialog-title"
+        >
           <div className="modal-content-box" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header-strip">
-              <h3 className="modal-headline-title">Create Short Link</h3>
+              <h3 id="create-dialog-title" className="modal-headline-title">Create Short Link</h3>
               <button
                 type="button"
                 className="btn-modal-close-x"
@@ -646,38 +733,63 @@ function App() {
               </button>
             </div>
 
-            <form onSubmit={handleShorten} className="modal-form-stack">
+            <form onSubmit={handleShorten} className="modal-form-stack" noValidate>
               <div className="form-field-group">
-                <label className="form-field-label">
+                <label htmlFor="create-dest-url" className="form-field-label">
                   Destination URL
                 </label>
                 <input
+                  id="create-dest-url"
+                  ref={urlInputRef}
                   type="url"
                   placeholder="https://example.com/long-destination-url"
                   value={url}
-                  onChange={(e) => setUrl(e.target.value)}
+                  onChange={(e) => {
+                    setUrl(e.target.value);
+                    if (urlError) setUrlError("");
+                  }}
                   required
-                  className="form-text-input"
+                  aria-invalid={!!urlError}
+                  aria-describedby={urlError ? "create-url-error" : undefined}
+                  className={`form-text-input ${urlError ? "has-error" : ""}`}
                 />
+                {urlError && (
+                  <div id="create-url-error" className="form-field-error" role="alert">
+                    <IconAlertTriangle size={13} />
+                    <span>{urlError}</span>
+                  </div>
+                )}
               </div>
 
               <div className="form-field-group">
-                <label className="form-field-label">
+                <label htmlFor="create-custom-alias" className="form-field-label">
                   Custom Alias (Optional)
                 </label>
-                <div className="form-alias-box">
+                <div className={`form-alias-box ${aliasError ? "has-error" : ""}`}>
                   <span className="alias-prefix-text">
                     {domainConfig.baseUrl}/
                   </span>
                   <input
+                    id="create-custom-alias"
                     type="text"
                     placeholder="promo-link"
                     value={customCode}
-                    onChange={(e) => setCustomCode(e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, ""))}
+                    onChange={(e) => {
+                      setCustomCode(e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, ""));
+                      if (aliasError) setAliasError("");
+                    }}
                     maxLength={30}
+                    aria-invalid={!!aliasError}
+                    aria-describedby={aliasError ? "create-alias-error" : undefined}
                     className="alias-input-element"
                   />
                 </div>
+                {aliasError && (
+                  <div id="create-alias-error" className="form-field-error" role="alert">
+                    <IconAlertTriangle size={13} />
+                    <span>{aliasError}</span>
+                  </div>
+                )}
               </div>
 
               {/* Quick Fill Pills */}
@@ -688,7 +800,10 @@ function App() {
                     key={item.label}
                     type="button"
                     className="quick-fill-chip"
-                    onClick={() => setUrl(item.url)}
+                    onClick={() => {
+                      setUrl(item.url);
+                      if (urlError) setUrlError("");
+                    }}
                   >
                     {item.label}
                   </button>
@@ -708,7 +823,17 @@ function App() {
                   className="btn-tool-primary"
                   disabled={loading}
                 >
-                  {loading ? "Shortening..." : "Shorten URL"}
+                  {loading ? (
+                    <>
+                      <IconRefresh size={14} className="is-spinning" />
+                      <span>Shortening...</span>
+                    </>
+                  ) : (
+                    <>
+                      <IconPlus size={14} />
+                      <span>Shorten URL</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -1183,8 +1308,12 @@ function App() {
                                 <button
                                   type="button"
                                   className={`btn-table-action ${isCopied ? "copied-check" : ""}`}
-                                  onClick={() => handleCopy(link.shortUrl, link.shortCode)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCopy(link.shortUrl, link.shortCode);
+                                  }}
                                   title="Copy short link"
+                                  aria-label="Copy short link"
                                 >
                                   {isCopied ? (
                                     <>
@@ -1199,9 +1328,13 @@ function App() {
                                 <button
                                   type="button"
                                   className="btn-table-action btn-hit-action"
-                                  onClick={() => handleTestClick(link.shortCode)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleTestClick(link.shortCode);
+                                  }}
                                   disabled={isTesting}
                                   title="Test atomic hit in database"
+                                  aria-label="Simulate click increment"
                                 >
                                   <IconZap size={12} />
                                   <span>{isTesting ? "+1..." : "+1 Hit"}</span>
@@ -1211,15 +1344,22 @@ function App() {
                                   target="_blank"
                                   rel="noreferrer"
                                   className="btn-table-action"
-                                  onClick={() => handleVisitLink(link.shortCode)}
-                                  title="Visit destination"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleVisitLink(link.shortCode);
+                                  }}
+                                  title="Visit destination URL"
+                                  aria-label="Visit destination URL"
                                 >
                                   <IconExternalLink size={12} />
                                 </a>
                                 <button
                                   type="button"
                                   className="btn-table-action btn-delete-row"
-                                  onClick={() => requestDelete(link)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    requestDelete(link);
+                                  }}
                                   title="Delete record"
                                   aria-label="Delete link record"
                                 >
@@ -1409,8 +1549,12 @@ function App() {
                               <button
                                 type="button"
                                 className={`btn-table-action ${isCopied ? "copied-check" : ""}`}
-                                onClick={() => handleCopy(link.shortUrl, link.shortCode)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopy(link.shortUrl, link.shortCode);
+                                }}
                                 title="Copy short link"
+                                aria-label="Copy short link"
                               >
                                 {isCopied ? (
                                   <>
@@ -1425,8 +1569,12 @@ function App() {
                               <button
                                 type="button"
                                 className={`btn-table-action ${isMdCopied ? "copied-check" : ""}`}
-                                onClick={() => handleCopyMarkdown(link)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopyMarkdown(link);
+                                }}
                                 title="Copy Markdown [Title](URL)"
+                                aria-label="Copy Markdown format"
                               >
                                 {isMdCopied ? (
                                   <>
@@ -1441,9 +1589,13 @@ function App() {
                               <button
                                 type="button"
                                 className="btn-table-action btn-hit-action"
-                                onClick={() => handleTestClick(link.shortCode)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleTestClick(link.shortCode);
+                                }}
                                 disabled={isTesting}
                                 title="Test atomic hit"
+                                aria-label="Simulate click increment"
                               >
                                 <IconZap size={12} />
                                 <span>{isTesting ? "+1..." : "+1 Hit"}</span>
@@ -1453,15 +1605,22 @@ function App() {
                                 target="_blank"
                                 rel="noreferrer"
                                 className="btn-table-action"
-                                onClick={() => handleVisitLink(link.shortCode)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleVisitLink(link.shortCode);
+                                }}
                                 title="Open redirect in new tab"
+                                aria-label="Visit destination URL"
                               >
                                 <IconExternalLink size={12} />
                               </a>
                               <button
                                 type="button"
                                 className="btn-table-action btn-delete-row"
-                                onClick={() => requestDelete(link)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  requestDelete(link);
+                                }}
                                 title="Delete link permanently"
                                 aria-label="Delete link record"
                               >
@@ -1537,101 +1696,164 @@ function App() {
              ---------------------------------------------------------------- */}
           {activeTab === "analytics" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              <section className="metrics-summary-grid">
-                <div className="metric-card-box">
-                  <span className="metric-box-title">Total Traffic Count</span>
-                  <div className="metric-box-figure">{totalClicks}</div>
-                  <span className="metric-box-explanation">Recorded redirect requests</span>
+              {initialLoading ? (
+                <div className="analytics-state-banner">
+                  <IconRefresh size={22} className="is-spinning" style={{ color: "var(--primary)" }} />
+                  <span className="analytics-state-title">Loading Analytics Telemetry</span>
+                  <p className="analytics-state-desc">
+                    Fetching verified visitor clicks and route telemetry from MongoDB Atlas...
+                  </p>
                 </div>
-                <div className="metric-card-box">
-                  <span className="metric-box-title">Average Clicks per Route</span>
-                  <div className="metric-box-figure">{averageClicks}</div>
-                  <span className="metric-box-explanation">Mathematical mean across vault</span>
+              ) : dbStatus.state === "disconnected" ? (
+                <div className="analytics-state-banner" style={{ borderColor: "var(--danger-border)" }}>
+                  <IconAlertTriangle size={24} style={{ color: "var(--danger)" }} />
+                  <span className="analytics-state-title">Analytics Engine Offline</span>
+                  <p className="analytics-state-desc">
+                    Unable to connect to the MongoDB Atlas cluster. Live redirect analytics and telemetry charts are currently unavailable.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn-tool-outline"
+                    onClick={() => {
+                      fetchLinks();
+                      checkDbStatus();
+                    }}
+                    style={{ marginTop: "6px" }}
+                  >
+                    Retry Connection
+                  </button>
                 </div>
-                <div className="metric-card-box">
-                  <span className="metric-box-title">Active Rate</span>
-                  <div className="metric-box-figure">
-                    {links.length > 0 ? `${Math.round((activeLinksCount / links.length) * 100)}%` : "0%"}
-                  </div>
-                  <span className="metric-box-explanation">Percentage of links with engagement</span>
+              ) : links.length === 0 ? (
+                <div className="analytics-state-banner">
+                  <IconFolder size={28} />
+                  <span className="analytics-state-title">No Links Created Yet</span>
+                  <p className="analytics-state-desc">
+                    Shorten your first URL to begin tracking real-time click engagement and destination host breakdowns.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn-tool-primary"
+                    style={{ marginTop: "6px" }}
+                    onClick={() => setCreateModalOpen(true)}
+                  >
+                    <IconPlus size={14} />
+                    <span>Create First Link</span>
+                  </button>
                 </div>
-                <div className="metric-card-box">
-                  <span className="metric-box-title">Zero-Click Drafts</span>
-                  <div className="metric-box-figure">{links.length - activeLinksCount}</div>
-                  <span className="metric-box-explanation">Links awaiting initial visitor</span>
-                </div>
-              </section>
-
-              <div className="analytics-two-col-grid">
-                {/* Traffic Leaderboard */}
-                <div className="chart-card-container">
-                  <div className="chart-card-header">
-                    <div>
-                      <h2 className="chart-card-heading">Top 5 Link Rankings</h2>
-                      <p className="chart-card-subheading">Highest click engagement routes</p>
+              ) : (
+                <>
+                  <section className="metrics-summary-grid">
+                    <div className="metric-card-box">
+                      <span className="metric-box-title">Total Traffic Count</span>
+                      <div className="metric-box-figure">{totalClicks}</div>
+                      <span className="metric-box-explanation">Recorded redirect requests</span>
                     </div>
-                  </div>
-                  <div className="top-links-chart-list">
-                    {topPerformingLinks.map((item, idx) => {
-                      const pct = Math.round(((item.clicks || 0) / (totalClicks || 1)) * 100);
-                      const barPct = Math.round(((item.clicks || 0) / maxClicksForChart) * 100);
-                      const domain = getCleanDomain(item.originalUrl);
-
-                      return (
-                        <div key={item.shortCode} className="chart-link-row">
-                          <div className="chart-row-meta">
-                            <span className="chart-slug-link">
-                              <span style={{ color: "var(--text-tertiary)", fontSize: "0.75rem", fontFamily: "var(--font-mono)" }}>#{idx + 1}</span>
-                              <img
-                                src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
-                                alt=""
-                                className="chart-favicon"
-                                onError={(e) => { e.target.style.display = 'none'; }}
-                              />
-                              /{item.shortCode}
-                            </span>
-                            <span className="chart-click-count">
-                              {item.clicks || 0} clicks <span style={{ color: "var(--text-tertiary)", fontSize: "0.75rem", fontWeight: 400 }}>({pct}%)</span>
-                            </span>
-                          </div>
-                          <div className="chart-bar-track">
-                            <div className="chart-bar-fill" style={{ width: `${Math.max(4, barPct)}%` }} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Target Host Breakdown */}
-                <div className="chart-card-container">
-                  <div className="chart-card-header">
-                    <div>
-                      <h2 className="chart-card-heading">Target Host Distribution</h2>
-                      <p className="chart-card-subheading">Breakdown of destinations shortened</p>
+                    <div className="metric-card-box">
+                      <span className="metric-box-title">Average Clicks per Route</span>
+                      <div className="metric-box-figure">{averageClicks}</div>
+                      <span className="metric-box-explanation">Mathematical mean across vault</span>
                     </div>
-                  </div>
-                  <div className="domain-distribution-list">
-                    {domainBreakdown.map((item) => (
-                      <div key={item.domain} className="domain-stat-item">
-                        <div className="domain-item-left">
-                          <img
-                            src={`https://www.google.com/s2/favicons?domain=${item.domain}&sz=32`}
-                            alt=""
-                            style={{ width: "14px", height: "14px", borderRadius: "2px" }}
-                            onError={(e) => { e.target.style.display = 'none'; }}
-                          />
-                          <span className="domain-name-text">{item.domain}</span>
-                        </div>
-                        <div className="domain-metrics-right">
-                          <span>{item.count} links</span>
-                          <span className="domain-percent-pill">{item.percent}%</span>
+                    <div className="metric-card-box">
+                      <span className="metric-box-title">Active Rate</span>
+                      <div className="metric-box-figure">
+                        {links.length > 0 ? `${Math.round((activeLinksCount / links.length) * 100)}%` : "0%"}
+                      </div>
+                      <span className="metric-box-explanation">Percentage of links with engagement</span>
+                    </div>
+                    <div className="metric-card-box">
+                      <span className="metric-box-title">Zero-Click Drafts</span>
+                      <div className="metric-box-figure">{links.length - activeLinksCount}</div>
+                      <span className="metric-box-explanation">Links awaiting initial visitor</span>
+                    </div>
+                  </section>
+
+                  <div className="analytics-two-col-grid">
+                    {/* Traffic Leaderboard */}
+                    <div className="chart-card-container">
+                      <div className="chart-card-header">
+                        <div>
+                          <h2 className="chart-card-heading">Top 5 Link Rankings</h2>
+                          <p className="chart-card-subheading">Highest click engagement routes</p>
                         </div>
                       </div>
-                    ))}
+                      {totalClicks === 0 ? (
+                        <div style={{ textAlign: "center", padding: "28px 12px", color: "var(--text-tertiary)", fontSize: "0.8125rem", lineHeight: 1.5 }}>
+                          0 verified clicks recorded yet. Your {links.length} shortened {links.length === 1 ? "route is" : "routes are"} active in MongoDB Atlas and awaiting initial visitor traffic.
+                        </div>
+                      ) : (
+                        <div className="top-links-chart-list">
+                          {topPerformingLinks.map((item, idx) => {
+                            const pct = Math.round(((item.clicks || 0) / (totalClicks || 1)) * 100);
+                            const barPct = Math.round(((item.clicks || 0) / maxClicksForChart) * 100);
+                            const domain = getCleanDomain(item.originalUrl);
+
+                            return (
+                              <div
+                                key={item.shortCode}
+                                className="chart-link-row"
+                                title={`Route /${item.shortCode} points to ${item.originalUrl}. Total: ${item.clicks || 0} clicks (${pct}% of traffic).`}
+                              >
+                                <div className="chart-row-meta">
+                                  <span className="chart-slug-link">
+                                    <span style={{ color: "var(--text-tertiary)", fontSize: "0.75rem", fontFamily: "var(--font-mono)" }}>#{idx + 1}</span>
+                                    <img
+                                      src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
+                                      alt=""
+                                      className="chart-favicon"
+                                      onError={(e) => { e.target.style.display = 'none'; }}
+                                    />
+                                    /{item.shortCode}
+                                  </span>
+                                  <span className="chart-click-count">
+                                    {item.clicks || 0} clicks <span style={{ color: "var(--text-tertiary)", fontSize: "0.75rem", fontWeight: 400 }}>({pct}%)</span>
+                                  </span>
+                                </div>
+                                <div className="chart-bar-track" role="progressbar" aria-valuenow={barPct} aria-valuemin={0} aria-valuemax={100} aria-label={`Clicks share for /${item.shortCode}`}>
+                                  <div className="chart-bar-fill" style={{ width: `${Math.max(4, barPct)}%` }} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Target Host Breakdown */}
+                    <div className="chart-card-container">
+                      <div className="chart-card-header">
+                        <div>
+                          <h2 className="chart-card-heading">Target Host Distribution</h2>
+                          <p className="chart-card-subheading">Breakdown of destinations shortened</p>
+                        </div>
+                        <span className="chart-legend-badge">{domainBreakdown.length} Domains</span>
+                      </div>
+                      <div className="domain-distribution-list">
+                        {domainBreakdown.map((item) => (
+                          <div
+                            key={item.domain}
+                            className="domain-stat-item"
+                            title={`${item.domain} has ${item.count} ${item.count === 1 ? "route" : "routes"} (${item.percent}% of total)`}
+                          >
+                            <div className="domain-item-left">
+                              <img
+                                src={`https://www.google.com/s2/favicons?domain=${item.domain}&sz=32`}
+                                alt=""
+                                style={{ width: "14px", height: "14px", borderRadius: "2px" }}
+                                onError={(e) => { e.target.style.display = 'none'; }}
+                              />
+                              <span className="domain-name-text">{item.domain}</span>
+                            </div>
+                            <div className="domain-metrics-right">
+                              <span>{item.count} {item.count === 1 ? "link" : "links"}</span>
+                              <span className="domain-percent-pill">{item.percent}%</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                </>
+              )}
             </div>
           )}
 

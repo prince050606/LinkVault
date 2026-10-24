@@ -1256,7 +1256,52 @@
 .toast-info .toast-pill-dot { background: var(--primary); }
 
 /* --------------------------------------------------------------------------
-   8. Responsive Layout Breakpoints
+   8. Form Validation & Interaction Feedback
+   -------------------------------------------------------------------------- */
+.form-field-error {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.74rem;
+  color: #fca5a5;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.form-text-input.has-error,
+.form-alias-box.has-error {
+  border-color: var(--danger) !important;
+}
+
+/* Analytics Empty & Offline Telemetry States */
+.analytics-state-banner {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 28px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  color: var(--text-tertiary);
+}
+
+.analytics-state-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.analytics-state-desc {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  max-width: 460px;
+  line-height: 1.45;
+}
+
+/* --------------------------------------------------------------------------
+   9. Responsive Layout Breakpoints
    -------------------------------------------------------------------------- */
 @media (max-width: 1024px) {
   .metrics-summary-grid {
@@ -1317,5 +1362,21 @@
 
   .dash-header-bar {
     padding: 0 var(--space-4);
+  }
+
+  /* Enhanced Touch Target Sizes on Mobile */
+  .btn-table-action {
+    height: 32px;
+    padding: 0 10px;
+    font-size: 0.78rem;
+  }
+
+  .btn-tool-outline,
+  .btn-tool-primary {
+    height: 36px;
+  }
+
+  .data-table-scroll-wrap {
+    -webkit-overflow-scrolling: touch;
   }
 }

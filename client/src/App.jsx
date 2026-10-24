@@ -50,7 +50,6 @@ function App() {
   const [shortUrl, setShortUrl] = useState("");
   const [lastOriginalUrl, setLastOriginalUrl] = useState("");
   const [lastShortCode, setLastShortCode] = useState("");
-  const [createModalOpen, setCreateModalOpen] = useState(false);
 
   // API & Data State
   const [links, setLinks] = useState([]);
@@ -457,28 +456,16 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Keyboard accessibility: Escape key closes active modals
+  // Keyboard accessibility: Escape key closes active delete confirmation modal
   useEffect(() => {
     function handleKeyDown(e) {
       if (e.key === "Escape") {
-        if (createModalOpen) setCreateModalOpen(false);
         if (confirmDeleteTarget) setConfirmDeleteTarget(null);
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [createModalOpen, confirmDeleteTarget]);
-
-  // Focus management: autofocus URL input when modal opens
-  useEffect(() => {
-    if (createModalOpen) {
-      const timer = setTimeout(() => {
-        setUrlError("");
-        urlInputRef.current?.focus();
-      }, 50);
-      return () => clearTimeout(timer);
-    }
-  }, [createModalOpen]);
+  }, [confirmDeleteTarget]);
 
   // Derived Analytics & Statistics (Accurate API-derived metrics, zero fabricated stats)
   const totalClicks = useMemo(
@@ -690,148 +677,6 @@ function App() {
         </div>
       )}
 
-      {/* Create Short Link Modal */}
-      {createModalOpen && (
-        <div
-          className="modal-overlay"
-          onClick={() => setCreateModalOpen(false)}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="create-dialog-title"
-        >
-          <div className="modal-content-box" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header-strip">
-              <h3 id="create-dialog-title" className="modal-headline-title">Create Short Link</h3>
-              <button
-                type="button"
-                className="btn-modal-close-x"
-                onClick={() => setCreateModalOpen(false)}
-                aria-label="Close dialog"
-              >
-                <IconX size={15} />
-              </button>
-            </div>
-
-            <form onSubmit={handleShorten} className="modal-form-stack" noValidate>
-              <div className="form-field-group">
-                <label htmlFor="create-dest-url" className="form-field-label">
-                  Destination URL
-                </label>
-                <input
-                  id="create-dest-url"
-                  ref={urlInputRef}
-                  type="url"
-                  placeholder="https://example.com/long-destination-url"
-                  value={url}
-                  onChange={(e) => {
-                    setUrl(e.target.value);
-                    if (urlError) setUrlError("");
-                  }}
-                  required
-                  aria-invalid={!!urlError}
-                  aria-describedby={urlError ? "create-url-error" : undefined}
-                  className={`form-text-input ${urlError ? "has-error" : ""}`}
-                />
-                {urlError && (
-                  <div id="create-url-error" className="form-field-error" role="alert">
-                    <IconAlertTriangle size={13} />
-                    <span>{urlError}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Quick Fill Pills */}
-              <div className="quick-fill-container">
-                <span className="quick-fill-label">Quick fill:</span>
-                {QUICK_TEST_URLS.map((item) => (
-                  <button
-                    key={item.label}
-                    type="button"
-                    className="quick-fill-chip"
-                    onClick={() => {
-                      setUrl(item.url);
-                      if (urlError) setUrlError("");
-                    }}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="modal-actions-container">
-                <button
-                  type="button"
-                  className="btn-tool-outline"
-                  onClick={() => setCreateModalOpen(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn-tool-primary"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <>
-                      <IconRefresh size={14} className="is-spinning" />
-                      <span>Shortening...</span>
-                    </>
-                  ) : (
-                    <>
-                      <IconPlus size={14} />
-                      <span>Shorten URL</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-
-            {/* Success Reveal inside modal */}
-            {shortUrl && (
-              <div className="created-link-callout">
-                <span className="created-callout-header">
-                  <IconCheck size={14} /> SHORT LINK READY
-                </span>
-                <a
-                  href={shortUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="created-url-anchor"
-                >
-                  {shortUrl}
-                </a>
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <button
-                    type="button"
-                    className="btn-tool-primary"
-                    onClick={() => handleCopy(shortUrl, shortUrl, "Copied short link")}
-                  >
-                    {copiedKey === shortUrl ? (
-                      <>
-                        <IconCheck size={13} /> Copied
-                      </>
-                    ) : (
-                      <>
-                        <IconCopy size={13} /> Copy Link
-                      </>
-                    )}
-                  </button>
-                  <a
-                    href={shortUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="btn-tool-outline"
-                    onClick={() => handleVisitLink(lastShortCode)}
-                  >
-                    Visit <IconExternalLink size={12} />
-                  </a>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Mobile Drawer Overlay */}
       <div
         className={`sidebar-mobile-overlay ${mobileSidebarOpen ? "mobile-open" : ""}`}
@@ -1032,6 +877,7 @@ function App() {
                         <IconLink size={16} />
                       </span>
                       <input
+                        ref={urlInputRef}
                         type="url"
                         placeholder="Paste long destination URL (e.g. https://...)"
                         value={url}
@@ -1460,16 +1306,19 @@ function App() {
                               <IconFolder size={32} />
                               <span className="empty-table-title">No links created yet</span>
                               <p className="empty-table-caption">
-                                Your MongoDB database is currently empty. Click the "+ Create Link" button to shorten your first URL.
+                                Your MongoDB database is currently empty. Use the URL shortener above to create your first trackable link.
                               </p>
                               <button
                                 type="button"
                                 className="btn-tool-primary"
                                 style={{ marginTop: "8px" }}
-                                onClick={() => setCreateModalOpen(true)}
+                                onClick={() => {
+                                  window.scrollTo({ top: 0, behavior: "smooth" });
+                                  urlInputRef.current?.focus();
+                                }}
                               >
                                 <IconPlus size={14} />
-                                <span>Create First Link</span>
+                                <span>Shorten a URL Above</span>
                               </button>
                             </div>
                           </td>
@@ -1570,6 +1419,21 @@ function App() {
                     title="Export as CSV"
                   >
                     CSV
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-tool-primary"
+                    onClick={() => {
+                      setActiveTab("overview");
+                      setTimeout(() => {
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                        urlInputRef.current?.focus();
+                      }, 80);
+                    }}
+                    title="Shorten a new URL"
+                  >
+                    <IconPlus size={14} />
+                    <span>Shorten URL</span>
                   </button>
                 </div>
               </div>
@@ -1821,10 +1685,16 @@ function App() {
                     type="button"
                     className="btn-tool-primary"
                     style={{ marginTop: "6px" }}
-                    onClick={() => setCreateModalOpen(true)}
+                    onClick={() => {
+                      setActiveTab("overview");
+                      setTimeout(() => {
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                        urlInputRef.current?.focus();
+                      }, 80);
+                    }}
                   >
                     <IconPlus size={14} />
-                    <span>Create First Link</span>
+                    <span>Go to URL Shortener</span>
                   </button>
                 </div>
               ) : (

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import "./App.css";
 import {
+  IconBrandLogo,
   IconLink,
   IconChart,
   IconTrendingUp,
@@ -627,6 +628,19 @@ function App() {
     }
   }
 
+  // Helper to cleanly decompose destination URLs for enhanced readability
+  function parseDestinationUrl(originalUrl) {
+    if (!originalUrl) return { host: "unknown", path: "" };
+    try {
+      const u = new URL(originalUrl);
+      const host = u.hostname.replace(/^www\./, "");
+      const path = (u.pathname === "/" ? "" : u.pathname) + u.search + u.hash;
+      return { host, path: path || "/" };
+    } catch {
+      return { host: originalUrl, path: "" };
+    }
+  }
+
   // Format Date
   function formatDate(isoString) {
     if (!isoString) return "Recently";
@@ -895,11 +909,16 @@ function App() {
         <div className="sidebar-top">
           {/* Brand Header */}
           <div className="sidebar-brand-row">
-            <div className="brand-identity-wrap">
+            <div className="brand-identity-wrap" title="LinkVault URL Management">
               <div className="brand-icon-box">
-                <IconLink size={16} />
+                <IconBrandLogo size={16} />
               </div>
-              {!sidebarCollapsed && <span className="brand-text-label">LinkVault</span>}
+              {!sidebarCollapsed && (
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span className="brand-text-label">LinkVault</span>
+                  <span className="brand-version-chip">v1.2</span>
+                </div>
+              )}
             </div>
 
             <button
@@ -1036,8 +1055,8 @@ function App() {
                 {activeTab === "settings" && "Settings"}
               </h1>
               <span className="dash-page-subtitle">
-                {activeTab === "overview" && "High-level link telemetry and performance summary."}
-                {activeTab === "links" && "Manage, search, test, and export your shortened URLs."}
+                {activeTab === "overview" && "Your links, in one place."}
+                {activeTab === "links" && "Search, filter, test, and export your shortened URLs."}
                 {activeTab === "analytics" && "Detailed click distribution and destination domain insights."}
                 {activeTab === "settings" && "LinkVault system configuration and database health."}
               </span>
@@ -1094,6 +1113,201 @@ function App() {
              ---------------------------------------------------------------- */}
           {activeTab === "overview" && (
             <>
+              {/* Central URL Quick-Composer (Primary product workflow) */}
+              <section className="overview-composer-card">
+                <div className="composer-header">
+                  <div className="composer-heading-group">
+                    <h2 className="composer-title">Shorten a URL</h2>
+                    <p className="composer-subtitle">Create clean, trackable links with instant click analytics.</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="composer-alias-toggle"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                  >
+                    {showAdvanced ? "Hide custom alias" : "+ Custom alias"}
+                  </button>
+                </div>
+
+                <form onSubmit={handleShorten} className="composer-form-stack" noValidate>
+                  <div className="composer-input-row">
+                    <div className="composer-url-input-wrap">
+                      <span className="composer-input-icon">
+                        <IconLink size={16} />
+                      </span>
+                      <input
+                        type="url"
+                        placeholder="Paste long destination URL (e.g. https://...)"
+                        value={url}
+                        onChange={(e) => {
+                          setUrl(e.target.value);
+                          if (urlError) setUrlError("");
+                        }}
+                        className={`composer-url-input ${urlError ? "has-error" : ""}`}
+                        required
+                        aria-invalid={!!urlError}
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="btn-tool-primary composer-submit-btn"
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <>
+                          <IconRefresh size={14} className="is-spinning" />
+                          <span>Shortening...</span>
+                        </>
+                      ) : (
+                        <>
+                          <IconPlus size={14} />
+                          <span>Shorten URL</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {urlError && (
+                    <div className="form-field-error" role="alert" style={{ marginTop: "8px" }}>
+                      <IconAlertTriangle size={13} />
+                      <span>{urlError}</span>
+                    </div>
+                  )}
+
+                  {/* Expandable Alias Row */}
+                  {showAdvanced && (
+                    <div className="composer-alias-row">
+                      <label htmlFor="overview-alias-input" className="composer-alias-label">
+                        Custom route slug:
+                      </label>
+                      <div className={`form-alias-box ${aliasError ? "has-error" : ""}`} style={{ maxWidth: "340px" }}>
+                        <span className="alias-prefix-text">{domainConfig.baseUrl}/</span>
+                        <input
+                          id="overview-alias-input"
+                          type="text"
+                          placeholder="promo-slug"
+                          value={customCode}
+                          onChange={(e) => {
+                            setCustomCode(e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, ""));
+                            if (aliasError) setAliasError("");
+                          }}
+                          maxLength={30}
+                          className="alias-input-element"
+                        />
+                      </div>
+                      {aliasError && (
+                        <div className="form-field-error" role="alert">
+                          <IconAlertTriangle size={13} />
+                          <span>{aliasError}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Quick Fill Chips */}
+                  <div className="quick-fill-container" style={{ marginTop: "10px" }}>
+                    <span className="quick-fill-label">Quick fill:</span>
+                    {QUICK_TEST_URLS.map((item) => (
+                      <button
+                        key={item.label}
+                        type="button"
+                        className="quick-fill-chip"
+                        onClick={() => {
+                          setUrl(item.url);
+                          if (urlError) setUrlError("");
+                        }}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </form>
+
+                {/* Active Link Hero Banner (Central visual element for generated link) */}
+                {shortUrl && (
+                  <div className="active-vault-link-hero">
+                    <div className="active-link-top-row">
+                      <div className="active-link-badge">
+                        <IconCheck size={13} />
+                        <span>Ready to Share</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-dismiss-active-link"
+                        onClick={() => setShortUrl("")}
+                        title="Dismiss banner"
+                        aria-label="Dismiss active link"
+                      >
+                        <IconX size={13} />
+                      </button>
+                    </div>
+
+                    <div className="active-link-main-row">
+                      <div className="active-link-display">
+                        <a
+                          href={shortUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="active-link-anchor"
+                          onClick={() => handleVisitLink(lastShortCode)}
+                          title="Open short URL"
+                        >
+                          <span className="active-link-slug">{shortUrl}</span>
+                        </a>
+                        {lastOriginalUrl && (
+                          <div className="active-link-target" title={lastOriginalUrl}>
+                            <span className="active-link-target-label">Target:</span>
+                            <span className="active-link-target-url">{lastOriginalUrl}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="active-link-actions-group">
+                        <button
+                          type="button"
+                          className={`btn-active-copy ${copiedKey === shortUrl ? "is-copied" : ""}`}
+                          onClick={() => handleCopy(shortUrl, shortUrl, "Copied short link")}
+                        >
+                          {copiedKey === shortUrl ? (
+                            <>
+                              <IconCheck size={13} />
+                              <span>Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <IconCopy size={13} />
+                              <span>Copy Link</span>
+                            </>
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn-tool-outline"
+                          onClick={() => handleTestClick(lastShortCode)}
+                          title="Simulate redirect hit"
+                        >
+                          <IconZap size={13} />
+                          <span>+1 Hit</span>
+                        </button>
+
+                        <a
+                          href={shortUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn-tool-outline"
+                          onClick={() => handleVisitLink(lastShortCode)}
+                          title="Open link in new tab"
+                        >
+                          <span>Visit</span>
+                          <IconExternalLink size={12} />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </section>
+
               {/* 3. SUMMARY METRICS ROW */}
               <section className="metrics-summary-grid">
                 <div className="metric-card-box">
@@ -1267,8 +1481,7 @@ function App() {
                         const isCopied = copiedKey === link.shortCode;
                         const isMdCopied = copiedKey === `md-${link.shortCode}`;
                         const isTesting = testingClickCode === link.shortCode;
-                        const isHighlighted = highlightCode === link.shortCode;
-                        const domain = getCleanDomain(link.originalUrl);
+                        const parsedDest = parseDestinationUrl(link.originalUrl);
 
                         return (
                           <tr key={link.shortCode || link._id} className={isHighlighted ? "highlight-ping" : ""}>
@@ -1285,19 +1498,23 @@ function App() {
                               </a>
                             </td>
                             <td>
-                              <div className="cell-destination-row" title={link.originalUrl}>
+                              <div className="dest-presentation-box" title={link.originalUrl}>
                                 <img
-                                  src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
+                                  src={`https://www.google.com/s2/favicons?domain=${parsedDest.host}&sz=32`}
                                   alt=""
                                   className="dest-favicon-table"
                                   onError={(e) => { e.target.style.display = 'none'; }}
                                 />
-                                <span className="dest-url-truncate">{link.originalUrl}</span>
+                                <span className="dest-host-pill">{parsedDest.host}</span>
+                                {parsedDest.path && parsedDest.path !== "/" && (
+                                  <span className="dest-path-text">{parsedDest.path}</span>
+                                )}
                               </div>
                             </td>
                             <td>
                               <span className={`clicks-counter-badge ${(link.clicks || 0) > 0 ? "has-traffic" : ""}`}>
-                                {link.clicks || 0}
+                                <span className={`status-indicator-dot ${(link.clicks || 0) > 0 ? "online" : "offline"}`} style={{ width: "6px", height: "6px" }} />
+                                <span>{link.clicks || 0}</span>
                               </span>
                             </td>
                             <td style={{ color: "var(--text-tertiary)", fontSize: "0.8rem", whiteSpace: "nowrap" }}>
@@ -1307,7 +1524,7 @@ function App() {
                               <div className="cell-actions-row" style={{ justifyContent: "flex-end" }}>
                                 <button
                                   type="button"
-                                  className={`btn-table-action ${isCopied ? "copied-check" : ""}`}
+                                  className={`btn-table-action ${isCopied ? "is-copied" : ""}`}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleCopy(link.shortUrl, link.shortCode);
@@ -1508,8 +1725,7 @@ function App() {
                       const isCopied = copiedKey === link.shortCode;
                       const isMdCopied = copiedKey === `md-${link.shortCode}`;
                       const isTesting = testingClickCode === link.shortCode;
-                      const isHighlighted = highlightCode === link.shortCode;
-                      const domain = getCleanDomain(link.originalUrl);
+                      const parsedDest = parseDestinationUrl(link.originalUrl);
 
                       return (
                         <tr key={link.shortCode || link._id} className={isHighlighted ? "highlight-ping" : ""}>
@@ -1526,19 +1742,23 @@ function App() {
                             </a>
                           </td>
                           <td>
-                            <div className="cell-destination-row" title={link.originalUrl}>
+                            <div className="dest-presentation-box" title={link.originalUrl}>
                               <img
-                                src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
+                                src={`https://www.google.com/s2/favicons?domain=${parsedDest.host}&sz=32`}
                                 alt=""
                                 className="dest-favicon-table"
                                 onError={(e) => { e.target.style.display = 'none'; }}
                               />
-                              <span className="dest-url-truncate">{link.originalUrl}</span>
+                              <span className="dest-host-pill">{parsedDest.host}</span>
+                              {parsedDest.path && parsedDest.path !== "/" && (
+                                <span className="dest-path-text">{parsedDest.path}</span>
+                              )}
                             </div>
                           </td>
                           <td>
                             <span className={`clicks-counter-badge ${(link.clicks || 0) > 0 ? "has-traffic" : ""}`}>
-                              {link.clicks || 0}
+                              <span className={`status-indicator-dot ${(link.clicks || 0) > 0 ? "online" : "offline"}`} style={{ width: "6px", height: "6px" }} />
+                              <span>{link.clicks || 0}</span>
                             </span>
                           </td>
                           <td style={{ color: "var(--text-tertiary)", fontSize: "0.8rem", whiteSpace: "nowrap" }}>
@@ -1548,7 +1768,7 @@ function App() {
                             <div className="cell-actions-row" style={{ justifyContent: "flex-end" }}>
                               <button
                                 type="button"
-                                className={`btn-table-action ${isCopied ? "copied-check" : ""}`}
+                                className={`btn-table-action ${isCopied ? "is-copied" : ""}`}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleCopy(link.shortUrl, link.shortCode);

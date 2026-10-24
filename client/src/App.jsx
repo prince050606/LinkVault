@@ -1,5 +1,27 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import "./App.css";
+import {
+  IconLink,
+  IconChart,
+  IconTrendingUp,
+  IconSettings,
+  IconZap,
+  IconClock,
+  IconSearch,
+  IconTrash,
+  IconCopy,
+  IconCheck,
+  IconExternalLink,
+  IconRefresh,
+  IconPlus,
+  IconX,
+  IconChevronLeft,
+  IconChevronRight,
+  IconMenu,
+  IconAlertTriangle,
+  IconFolder,
+  IconFileText,
+} from "./components/Icons";
 
 const API_URL =
   import.meta.env.VITE_API_URL ||
@@ -244,7 +266,7 @@ function App() {
   }
 
   // Copy to Clipboard with visible confirmation
-  async function handleCopy(text, key, customMsg = "Copied to clipboard! 📋") {
+  async function handleCopy(text, key, customMsg = "Copied to clipboard") {
     playCyberChime("click");
     try {
       await navigator.clipboard.writeText(text);
@@ -575,17 +597,18 @@ function App() {
                 type="button"
                 className="btn-modal-close-x"
                 onClick={() => setConfirmDeleteTarget(null)}
+                aria-label="Close dialog"
               >
-                ×
+                <IconX size={15} />
               </button>
             </div>
-            <p className="settings-card-desc" style={{ marginBottom: "14px" }}>
+            <p className="settings-card-desc" style={{ marginBottom: "12px" }}>
               Are you sure you want to permanently delete <code style={{ color: "#818cf8" }}>/{confirmDeleteTarget.shortCode}</code> from MongoDB Atlas? Visitors will receive a 404 error.
             </p>
-            <div style={{ background: "var(--bg-app)", padding: "10px 12px", borderRadius: "6px", fontSize: "0.82rem", wordBreak: "break-all", marginBottom: "20px", color: "var(--text-tertiary)" }}>
+            <div style={{ background: "var(--bg-app)", padding: "10px 12px", borderRadius: "6px", fontSize: "0.8125rem", wordBreak: "break-all", marginBottom: "16px", color: "var(--text-tertiary)", border: "1px solid var(--border-subtle)" }}>
               {confirmDeleteTarget.originalUrl}
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+            <div className="modal-actions-container">
               <button
                 type="button"
                 className="btn-tool-outline"
@@ -612,19 +635,20 @@ function App() {
         <div className="modal-overlay" onClick={() => setCreateModalOpen(false)}>
           <div className="modal-content-box" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header-strip">
-              <h3 className="modal-headline-title">Create New Short Link</h3>
+              <h3 className="modal-headline-title">Create Short Link</h3>
               <button
                 type="button"
                 className="btn-modal-close-x"
                 onClick={() => setCreateModalOpen(false)}
+                aria-label="Close dialog"
               >
-                ×
+                <IconX size={15} />
               </button>
             </div>
 
-            <form onSubmit={handleShorten} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-              <div>
-                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "6px" }}>
+            <form onSubmit={handleShorten} className="modal-form-stack">
+              <div className="form-field-group">
+                <label className="form-field-label">
                   Destination URL
                 </label>
                 <input
@@ -633,25 +657,16 @@ function App() {
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   required
-                  style={{
-                    width: "100%",
-                    background: "var(--bg-input)",
-                    border: "1px solid var(--border-medium)",
-                    borderRadius: "6px",
-                    padding: "8px 12px",
-                    color: "var(--text-primary)",
-                    fontSize: "0.9rem",
-                    outline: "none",
-                  }}
+                  className="form-text-input"
                 />
               </div>
 
-              <div>
-                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "6px" }}>
+              <div className="form-field-group">
+                <label className="form-field-label">
                   Custom Alias (Optional)
                 </label>
-                <div style={{ display: "flex", alignItems: "center", background: "var(--bg-input)", border: "1px solid var(--border-medium)", borderRadius: "6px", padding: "6px 10px" }}>
-                  <span style={{ fontSize: "0.82rem", color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", marginRight: "4px" }}>
+                <div className="form-alias-box">
+                  <span className="alias-prefix-text">
                     {domainConfig.baseUrl}/
                   </span>
                   <input
@@ -660,34 +675,19 @@ function App() {
                     value={customCode}
                     onChange={(e) => setCustomCode(e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, ""))}
                     maxLength={30}
-                    style={{
-                      flex: 1,
-                      background: "transparent",
-                      border: "none",
-                      outline: "none",
-                      color: "var(--text-primary)",
-                      fontSize: "0.88rem",
-                      fontFamily: "var(--font-mono)",
-                    }}
+                    className="alias-input-element"
                   />
                 </div>
               </div>
 
               {/* Quick Fill Pills */}
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", marginTop: "2px" }}>
-                <span style={{ fontSize: "0.74rem", color: "var(--text-tertiary)" }}>Quick fill:</span>
+              <div className="quick-fill-container">
+                <span className="quick-fill-label">Quick fill:</span>
                 {QUICK_TEST_URLS.map((item) => (
                   <button
                     key={item.label}
                     type="button"
-                    style={{
-                      background: "var(--bg-app)",
-                      border: "1px solid var(--border-subtle)",
-                      borderRadius: "12px",
-                      padding: "2px 8px",
-                      fontSize: "0.74rem",
-                      color: "var(--text-secondary)",
-                    }}
+                    className="quick-fill-chip"
                     onClick={() => setUrl(item.url)}
                   >
                     {item.label}
@@ -695,7 +695,7 @@ function App() {
                 ))}
               </div>
 
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "12px" }}>
+              <div className="modal-actions-container">
                 <button
                   type="button"
                   className="btn-tool-outline"
@@ -715,15 +715,15 @@ function App() {
 
             {/* Success Reveal inside modal */}
             {shortUrl && (
-              <div style={{ marginTop: "16px", padding: "14px", background: "var(--bg-app)", borderRadius: "8px", border: "1px solid var(--primary-border)" }}>
-                <span style={{ fontSize: "0.75rem", color: "#34d399", fontWeight: 600, display: "block", marginBottom: "4px" }}>
-                  ✓ SHORT LINK CREATED
+              <div className="created-link-callout">
+                <span className="created-callout-header">
+                  <IconCheck size={14} /> SHORT LINK READY
                 </span>
                 <a
                   href={shortUrl}
                   target="_blank"
                   rel="noreferrer"
-                  style={{ fontSize: "1rem", fontWeight: 600, fontFamily: "var(--font-mono)", color: "#fff", display: "block", marginBottom: "10px" }}
+                  className="created-url-anchor"
                 >
                   {shortUrl}
                 </a>
@@ -731,9 +731,17 @@ function App() {
                   <button
                     type="button"
                     className="btn-tool-primary"
-                    onClick={() => handleCopy(shortUrl, shortUrl, "Copied short link! 📋")}
+                    onClick={() => handleCopy(shortUrl, shortUrl, "Copied short link")}
                   >
-                    {copiedKey === shortUrl ? "Copied! ✓" : "Copy Link"}
+                    {copiedKey === shortUrl ? (
+                      <>
+                        <IconCheck size={13} /> Copied
+                      </>
+                    ) : (
+                      <>
+                        <IconCopy size={13} /> Copy Link
+                      </>
+                    )}
                   </button>
                   <a
                     href={shortUrl}
@@ -742,7 +750,7 @@ function App() {
                     className="btn-tool-outline"
                     onClick={() => handleVisitLink(lastShortCode)}
                   >
-                    Visit ↗
+                    Visit <IconExternalLink size={12} />
                   </a>
                 </div>
               </div>
@@ -763,7 +771,9 @@ function App() {
           {/* Brand Header */}
           <div className="sidebar-brand-row">
             <div className="brand-identity-wrap">
-              <div className="brand-icon-box">🔗</div>
+              <div className="brand-icon-box">
+                <IconLink size={16} />
+              </div>
               {!sidebarCollapsed && <span className="brand-text-label">LinkVault</span>}
             </div>
 
@@ -772,8 +782,9 @@ function App() {
               className="btn-sidebar-collapse"
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
               title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-              {sidebarCollapsed ? "»" : "«"}
+              {sidebarCollapsed ? <IconChevronRight size={14} /> : <IconChevronLeft size={14} />}
             </button>
           </div>
 
@@ -785,7 +796,7 @@ function App() {
               onClick={() => setCreateModalOpen(true)}
               title="Create New Short Link"
             >
-              <span>+</span>
+              <IconPlus size={15} />
               {!sidebarCollapsed && <span>New Link</span>}
             </button>
           </div>
@@ -801,7 +812,9 @@ function App() {
               }}
               title="Overview Dashboard"
             >
-              <span className="nav-item-icon">📊</span>
+              <span className="nav-item-icon">
+                <IconChart size={16} />
+              </span>
               {!sidebarCollapsed && <span>Overview</span>}
             </button>
 
@@ -814,7 +827,9 @@ function App() {
               }}
               title="My Links Table"
             >
-              <span className="nav-item-icon">🔗</span>
+              <span className="nav-item-icon">
+                <IconLink size={16} />
+              </span>
               {!sidebarCollapsed && <span>My Links</span>}
               {!sidebarCollapsed && <span className="nav-item-counter">{links.length}</span>}
             </button>
@@ -828,7 +843,9 @@ function App() {
               }}
               title="Click Analytics"
             >
-              <span className="nav-item-icon">📈</span>
+              <span className="nav-item-icon">
+                <IconTrendingUp size={16} />
+              </span>
               {!sidebarCollapsed && <span>Analytics</span>}
             </button>
 
@@ -841,7 +858,9 @@ function App() {
               }}
               title="System Settings"
             >
-              <span className="nav-item-icon">⚙️</span>
+              <span className="nav-item-icon">
+                <IconSettings size={16} />
+              </span>
               {!sidebarCollapsed && <span>Settings</span>}
             </button>
           </nav>
@@ -879,9 +898,9 @@ function App() {
               type="button"
               className="btn-mobile-sidebar-toggle"
               onClick={() => setMobileSidebarOpen(true)}
-              aria-label="Open sidebar"
+              aria-label="Open sidebar navigation"
             >
-              ☰
+              <IconMenu size={18} />
             </button>
 
             <div className="dash-title-group">
@@ -908,7 +927,7 @@ function App() {
               disabled={refreshing}
               title="Refresh database records"
             >
-              <span className={`spin-icon ${refreshing ? "is-spinning" : ""}`}>↻</span>
+              <IconRefresh size={14} className={refreshing ? "is-spinning" : ""} />
               <span>{refreshing ? "Syncing..." : "Sync"}</span>
             </button>
 
@@ -917,7 +936,8 @@ function App() {
               className="btn-tool-primary"
               onClick={() => setCreateModalOpen(true)}
             >
-              + Create Link
+              <IconPlus size={14} />
+              <span>Create Link</span>
             </button>
           </div>
         </header>
@@ -927,7 +947,10 @@ function App() {
           {/* API Error Alert Banner with Retry Button */}
           {apiError && (
             <div className="dash-error-banner">
-              <span>⚠️ {apiError}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <IconAlertTriangle size={15} />
+                <span>{apiError}</span>
+              </span>
               <button
                 type="button"
                 className="btn-retry-conn"
@@ -951,7 +974,9 @@ function App() {
                 <div className="metric-card-box">
                   <div className="metric-card-top">
                     <span className="metric-box-title">Total Links</span>
-                    <span className="metric-box-glyph">🔗</span>
+                    <span className="metric-box-glyph">
+                      <IconLink size={15} />
+                    </span>
                   </div>
                   <div className="metric-box-figure">{links.length}</div>
                   <span className="metric-box-explanation">Permanent records in MongoDB Atlas</span>
@@ -960,7 +985,9 @@ function App() {
                 <div className="metric-card-box">
                   <div className="metric-card-top">
                     <span className="metric-box-title">Total Redirects</span>
-                    <span className="metric-box-glyph">📈</span>
+                    <span className="metric-box-glyph">
+                      <IconTrendingUp size={15} />
+                    </span>
                   </div>
                   <div className="metric-box-figure">{totalClicks}</div>
                   <span className="metric-box-explanation">Lifetime atomic visitor click increments</span>
@@ -969,7 +996,9 @@ function App() {
                 <div className="metric-card-box">
                   <div className="metric-card-top">
                     <span className="metric-box-title">Active Links</span>
-                    <span className="metric-box-glyph">⚡</span>
+                    <span className="metric-box-glyph">
+                      <IconZap size={15} />
+                    </span>
                   </div>
                   <div className="metric-box-figure">{activeLinksCount}</div>
                   <span className="metric-box-explanation">
@@ -980,7 +1009,9 @@ function App() {
                 <div className="metric-card-box">
                   <div className="metric-card-top">
                     <span className="metric-box-title">24h Activity</span>
-                    <span className="metric-box-glyph">🕒</span>
+                    <span className="metric-box-glyph">
+                      <IconClock size={15} />
+                    </span>
                   </div>
                   <div className="metric-box-figure">{recentActivityCount}</div>
                   <span className="metric-box-explanation">New links shortened in the last 24 hours</span>
@@ -1155,7 +1186,15 @@ function App() {
                                   onClick={() => handleCopy(link.shortUrl, link.shortCode)}
                                   title="Copy short link"
                                 >
-                                  {isCopied ? "Copied! ✓" : "Copy"}
+                                  {isCopied ? (
+                                    <>
+                                      <IconCheck size={12} /> Copied
+                                    </>
+                                  ) : (
+                                    <>
+                                      <IconCopy size={12} /> Copy
+                                    </>
+                                  )}
                                 </button>
                                 <button
                                   type="button"
@@ -1164,7 +1203,8 @@ function App() {
                                   disabled={isTesting}
                                   title="Test atomic hit in database"
                                 >
-                                  {isTesting ? "+1..." : "+1 Hit"}
+                                  <IconZap size={12} />
+                                  <span>{isTesting ? "+1..." : "+1 Hit"}</span>
                                 </button>
                                 <a
                                   href={link.shortUrl}
@@ -1174,15 +1214,16 @@ function App() {
                                   onClick={() => handleVisitLink(link.shortCode)}
                                   title="Visit destination"
                                 >
-                                  ↗
+                                  <IconExternalLink size={12} />
                                 </a>
                                 <button
                                   type="button"
                                   className="btn-table-action btn-delete-row"
                                   onClick={() => requestDelete(link)}
                                   title="Delete record"
+                                  aria-label="Delete link record"
                                 >
-                                  🗑️
+                                  <IconTrash size={12} />
                                 </button>
                               </div>
                             </td>
@@ -1193,7 +1234,7 @@ function App() {
                         <tr>
                           <td colSpan={5} className="table-empty-cell">
                             <div className="empty-table-box">
-                              <span style={{ fontSize: "1.8rem" }}>📂</span>
+                              <IconFolder size={32} />
                               <span className="empty-table-title">No links created yet</span>
                               <p className="empty-table-caption">
                                 Your MongoDB database is currently empty. Click the "+ Create Link" button to shorten your first URL.
@@ -1204,7 +1245,8 @@ function App() {
                                 style={{ marginTop: "8px" }}
                                 onClick={() => setCreateModalOpen(true)}
                               >
-                                + Create First Link
+                                <IconPlus size={14} />
+                                <span>Create First Link</span>
                               </button>
                             </div>
                           </td>
@@ -1260,7 +1302,7 @@ function App() {
 
                 <div className="toolbar-controls-right">
                   <div className="table-search-input-box">
-                    <span style={{ color: "var(--text-tertiary)", fontSize: "0.82rem" }}>🔍</span>
+                    <IconSearch size={14} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
                     <input
                       type="text"
                       placeholder="Search code or destination..."
@@ -1272,9 +1314,10 @@ function App() {
                       <button
                         type="button"
                         onClick={() => setSearchQuery("")}
-                        style={{ color: "var(--text-tertiary)", fontSize: "0.9rem" }}
+                        style={{ color: "var(--text-tertiary)", display: "flex", alignItems: "center" }}
+                        aria-label="Clear search"
                       >
-                        ×
+                        <IconX size={12} />
                       </button>
                     )}
                   </div>
@@ -1367,8 +1410,17 @@ function App() {
                                 type="button"
                                 className={`btn-table-action ${isCopied ? "copied-check" : ""}`}
                                 onClick={() => handleCopy(link.shortUrl, link.shortCode)}
+                                title="Copy short link"
                               >
-                                {isCopied ? "Copied! ✓" : "Copy"}
+                                {isCopied ? (
+                                  <>
+                                    <IconCheck size={12} /> Copied
+                                  </>
+                                ) : (
+                                  <>
+                                    <IconCopy size={12} /> Copy
+                                  </>
+                                )}
                               </button>
                               <button
                                 type="button"
@@ -1376,7 +1428,15 @@ function App() {
                                 onClick={() => handleCopyMarkdown(link)}
                                 title="Copy Markdown [Title](URL)"
                               >
-                                {isMdCopied ? "MD ✓" : "MD"}
+                                {isMdCopied ? (
+                                  <>
+                                    <IconCheck size={12} /> MD
+                                  </>
+                                ) : (
+                                  <>
+                                    <IconFileText size={12} /> MD
+                                  </>
+                                )}
                               </button>
                               <button
                                 type="button"
@@ -1385,7 +1445,8 @@ function App() {
                                 disabled={isTesting}
                                 title="Test atomic hit"
                               >
-                                {isTesting ? "+1..." : "+1 Hit"}
+                                <IconZap size={12} />
+                                <span>{isTesting ? "+1..." : "+1 Hit"}</span>
                               </button>
                               <a
                                 href={link.shortUrl}
@@ -1395,15 +1456,16 @@ function App() {
                                 onClick={() => handleVisitLink(link.shortCode)}
                                 title="Open redirect in new tab"
                               >
-                                ↗
+                                <IconExternalLink size={12} />
                               </a>
                               <button
                                 type="button"
                                 className="btn-table-action btn-delete-row"
                                 onClick={() => requestDelete(link)}
                                 title="Delete link permanently"
+                                aria-label="Delete link record"
                               >
-                                🗑️
+                                <IconTrash size={12} />
                               </button>
                             </div>
                           </td>
@@ -1415,7 +1477,7 @@ function App() {
                       <tr>
                         <td colSpan={5} className="table-empty-cell">
                           <div className="empty-table-box">
-                            <span style={{ fontSize: "1.8rem" }}>🔍</span>
+                            <IconSearch size={28} />
                             <span className="empty-table-title">No links matching filter criteria</span>
                             <p className="empty-table-caption">
                               Try clearing your search query or switching to the "All Links" tab.
